@@ -346,12 +346,13 @@ def open_admin_main_window():
     destinations_button = PushButton(button_box, text="DESTINATIONS", width=15, command=open_destinations_window)
     coaches_button = PushButton(button_box, text="COACHES", width=15, command=open_coaches_window)
     drivers_button = PushButton(button_box, text="DRIVERS", width=15, command=open_drivers_window)
+    search_button = PushButton(button_box, text="SEARCH", width=15, command=open_query_window) # Added Search button
     customers_button.bg = BUTTON_BG_COLOR; customers_button.text_color = BUTTON_TEXT_COLOR
     destinations_button.bg = BUTTON_BG_COLOR; destinations_button.text_color = BUTTON_TEXT_COLOR
     coaches_button.bg = BUTTON_BG_COLOR; coaches_button.text_color = BUTTON_TEXT_COLOR
     drivers_button.bg = BUTTON_BG_COLOR; drivers_button.text_color = BUTTON_TEXT_COLOR
+    search_button.bg = BUTTON_BG_COLOR; search_button.text_color = BUTTON_TEXT_COLOR # Style for Search button
     admin_main_window.show()
-#endregion
 
 #region Staff Windows
 # --- Staff Window Functions ---
@@ -426,17 +427,18 @@ def open_staff_window():
     Text(staff_window, text="Main Menu", color=TEXT_COLOR, size=14, font="Arial")
     button_box = Box(staff_window, layout="auto", width="fill")
     customers_button = PushButton(button_box, text="CUSTOMERS", width=15, command=open_staff_customers_window)
-    bookings_button = PushButton(button_box, text="BOOKINGS", width=15, command=open_staff_bookings_window) # Added Bookings button here
+    bookings_button = PushButton(button_box, text="BOOKINGS", width=15, command=open_staff_bookings_window)
     destinations_button = PushButton(button_box, text="DESTINATIONS", width=15, command=open_staff_destinations_window)
     trips_button = PushButton(button_box, text="TRIPS", width=15, command=open_staff_trips_window)
-    back_button = PushButton(button_box, text="Back", width=15, command=go_back_to_main_menu)  # Corrected
+    search_button = PushButton(button_box, text="SEARCH", width=15, command=open_query_window)  # Add Search button here
+    back_button = PushButton(button_box, text="Back", width=15, command=go_back_to_main_menu)
     customers_button.bg = BUTTON_BG_COLOR; customers_button.text_color = BUTTON_TEXT_COLOR
-    bookings_button.bg = BUTTON_BG_COLOR; bookings_button.text_color = BUTTON_TEXT_COLOR # Style for new button
+    bookings_button.bg = BUTTON_BG_COLOR; bookings_button.text_color = BUTTON_TEXT_COLOR
     destinations_button.bg = BUTTON_BG_COLOR; destinations_button.text_color = BUTTON_TEXT_COLOR
     trips_button.bg = BUTTON_BG_COLOR; trips_button.text_color = BUTTON_TEXT_COLOR
+    search_button.bg = BUTTON_BG_COLOR; search_button.text_color = BUTTON_TEXT_COLOR # Style for search button
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     staff_window.show()
-#endregion
 
 #region Add and Remove Windows
 #--------------------------Add and Remove Windows--------------------------------
@@ -830,6 +832,143 @@ def check_admin_login():
         open_admin_main_window()
     else:
         info("Login Failed", "Incorrect username or password.")
+
+
+def open_query_window():
+    """Opens a window for executing various database queries."""
+    query_window = Window(app, title="Database Queries", width=800, height=600, bg=BG_COLOR)
+    Text(query_window, text="Select a Query:", color=TEXT_COLOR)
+
+    # --- Query 1: Passengers on a specific trip ---
+    def lincoln_passengers():
+      try:
+          # Added CityName for flexibility.
+          cursor.execute("""
+              SELECT c.FirstName, c.Surname
+              FROM customers c
+              JOIN bookings b ON c.CustomerID = b.CustomerID
+              JOIN trips t ON b.TripID = t.TripID
+              JOIN destinations d ON t.DestinationID = d.DestinationID
+              WHERE d.CityName = 'Lincoln' AND t.Date = '2024-12-19'
+          """)
+          passengers = cursor.fetchall()
+
+          result_window = Window(query_window, title="Lincoln Passengers", width=400, height=300, bg=BG_COLOR)
+          result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
+          if passengers:
+              for passenger in passengers:
+                  result_list.append(f"{passenger['FirstName']} {passenger['Surname']}")
+          else:
+              result_list.append("No passengers found for this trip.")
+          close_button = PushButton(result_window, text="Close", command=result_window.destroy)
+          close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
+          result_window.show()
+
+      except mysql.connector.Error as err:
+          info("Database Error", f"Error fetching passenger data: {err}")
+
+    # --- Query 2: Available trips in chronological order ---
+    def available_trips():
+        try:
+            cursor.execute("""
+                SELECT t.Date, d.DestinationName, d.CityName
+                FROM trips t
+                JOIN destinations d ON t.DestinationID = d.DestinationID
+                WHERE t.Date >= CURDATE()
+                ORDER BY t.Date DESC
+            """)
+            trips = cursor.fetchall()
+
+            result_window = Window(query_window, title="Available Trips", width=600, height=400, bg=BG_COLOR)
+            result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
+            if trips:
+                for trip in trips:
+                    result_list.append(f"Date: {trip['Date']}, Destination: {trip['DestinationName']}, City: {trip['CityName']}")
+            else:
+                result_list.append("No trips currently available.")
+            close_button = PushButton(result_window, text = "Close", command = result_window.destroy)
+            close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
+            result_window.show()
+
+        except mysql.connector.Error as err:
+            info("Database Error", f"Error fetching trip data: {err}")
+
+    # --- Query 3: Customers in SW1 postcode area ---
+    def sw1_customers():
+        try:
+            cursor.execute("""
+                SELECT FirstName, Surname, AddressLine1, AddressLine2, City, Postcode
+                FROM customers
+                WHERE Postcode LIKE 'SW1%'
+            """)
+            customers = cursor.fetchall()
+
+            result_window = Window(query_window, title="SW1 Customers", width=600, height=400, bg=BG_COLOR)
+            result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
+            if customers:
+                for customer in customers:
+                    result_list.append(f"{customer['FirstName']} {customer['Surname']}, {customer['AddressLine1']}, {customer['AddressLine2']}, {customer['City']}, {customer['Postcode']}")
+            else:
+                result_list.append("No customers found in SW1.")
+            close_button = PushButton(result_window, text = "Close", command = result_window.destroy)
+            close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR;
+            result_window.show()
+        except mysql.connector.Error as err:
+            info("Database Error", f"Error fetching customer data: {err}")
+
+  # --- Query 4:  Current Income for a specific trip
+    def trip_income_window():
+      #Create a window prompting for the trip ID to run calculations for
+        income_window = Window(query_window, title = "Calculate Trip Income", width = 400, height = 200, bg = BG_COLOR)
+        Text(income_window, text="Enter Trip ID:", color=TEXT_COLOR)
+        trip_id_entry = TextBox(income_window)
+        
+        #Function that takes the input value and runs the calculation.
+        def calculate_income():
+            try:
+                trip_id = trip_id_entry.value
+                #Checks if the entered ID is a number before going to cursor.
+                if not trip_id.isdigit():
+                    info("Input Error", "Trip ID must be a number.")
+                    return
+
+
+                cursor.execute("""
+                    SELECT SUM(b.BookingCost) AS TotalIncome
+                    FROM bookings b
+                    WHERE b.TripID = %s
+                """, (trip_id,))
+                result = cursor.fetchone()  # Use fetchone() since we expect a single row
+
+                if result and result['TotalIncome'] is not None:
+                    info("Trip Income", f"Total income for Trip ID {trip_id}: £{result['TotalIncome']:.2f}")
+                else:
+                    info("Trip Income", f"No bookings found for Trip ID {trip_id}, or income is 0.")
+            except mysql.connector.Error as err:
+                info("Database Error", f"Error calculating income: {err}")
+            finally: #Closes trip_income_window whether it runs the query or not.
+                income_window.destroy()
+                
+        calculate_button = PushButton(income_window, text = "Calculate", command = calculate_income)
+        cancel_button = PushButton(income_window, text = "Cancel", command = income_window.destroy)
+        calculate_button.bg = BUTTON_BG_COLOR; calculate_button.text_color = BUTTON_TEXT_COLOR
+        cancel_button.bg = BUTTON_BG_COLOR; cancel_button.text_color = BUTTON_TEXT_COLOR
+        income_window.show()
+        
+
+    # --- Buttons for each query ---
+    passengers_button = PushButton(query_window, text="Lincoln Passengers (19th Dec 2024)", command=lincoln_passengers)
+    trips_button = PushButton(query_window, text="Available Trips", command=available_trips)
+    sw1_button = PushButton(query_window, text="SW1 Customers", command=sw1_customers)
+    income_button = PushButton(query_window, text = "Calculate Trip Income", command = trip_income_window)
+    back_button = PushButton(query_window, text="Back", command=query_window.destroy)
+
+    passengers_button.bg = BUTTON_BG_COLOR; passengers_button.text_color = BUTTON_TEXT_COLOR
+    trips_button.bg = BUTTON_BG_COLOR; trips_button.text_color = BUTTON_TEXT_COLOR
+    sw1_button.bg = BUTTON_BG_COLOR; sw1_button.text_color = BUTTON_TEXT_COLOR
+    income_button.bg = BUTTON_BG_COLOR; income_button.text_color = BUTTON_TEXT_COLOR;
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+    query_window.show()
 
 def open_admin_login_window():
     app.hide()
