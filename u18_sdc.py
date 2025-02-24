@@ -181,7 +181,8 @@ def open_customers_data_window():
     customers_data = get_all_customers()
     if customers_data:
         for customer in customers_data:
-            customers_list.append(f"Customer ID: {customer['CustomerID']}, Name: {customer['CustomerFirstName']} {customer['CustomerSurname']}, Email: {customer['CustomerEmail']}, Address: {customer['AddressLine1']} {customer['AddressLine2']} {customer['City']} {customer['Postcode']}, Phone: {customer['PhoneNumber']}, Notes: {customer['SpecialNotes']}")
+            # Corrected attribute names here
+            customers_list.append(f"Customer ID: {customer['CustomerID']}, Name: {customer['FirstName']} {customer['Surname']}, Email: {customer['Email']}, Address: {customer['AddressLine1']} {customer['AddressLine2']} {customer['City']} {customer['Postcode']}, Phone: {customer['PhoneNumber']}, Notes: {customer['SpecialNotes']}")
     else:
         customers_list.append("Could not retrieve customer data.")
     customers_data_window.show()
@@ -200,7 +201,8 @@ def open_coaches_data_window():
     coaches_data = get_all_coaches()
     if coaches_data:
         for coach in coaches_data:
-            coaches_list.append(f"Coach ID: {coach['CoachID']}, Registration: {coach['CoachReg']}, Seats: {coach['Seats']}")
+            # Corrected attribute names here
+            coaches_list.append(f"Coach ID: {coach['CoachID']}, Registration: {coach['Registration']}, Seats: {coach['Seats']}")
     else:
         coaches_list.append("Could not retrieve coach data.")
     coaches_data_window.show()
@@ -220,7 +222,8 @@ def open_destinations_data_window():
     destinations_data = get_all_destinations()
     if destinations_data:
         for destination in destinations_data:
-            destinations_list.append(f"Destination ID: {destination['DestinationID']}, Name: {destination['DestinationName']}, Hotel: {destination['Hotel']}, Cost: {destination['Cost']}, City: {destination['City']}, Days: {destination['Days']}")
+             # Corrected attribute names here
+            destinations_list.append(f"Destination ID: {destination['DestinationID']}, Name: {destination['DestinationName']}, Hotel: {destination['Hotel']}, Cost: {destination['DestinationCost']}, City: {destination['CityName']}, Days: {destination['Days']}")
     else:
         destinations_list.append("Could not retrieve destination data.")
     destinations_data_window.show()
@@ -485,6 +488,7 @@ def open_add_booking_window():
     back_button = PushButton(add_booking_window, text="Back", command=add_booking_window.destroy)
     add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+    add_booking_window.show()
 
 def open_add_coach_window():
     global add_coach_window, coach_reg_entry, seats_entry
@@ -499,8 +503,9 @@ def open_add_coach_window():
 
     def add_coach():
         try:
+            # Corrected SQL query
             cursor.execute("""
-            INSERT INTO coaches (CoachReg, Seats)
+            INSERT INTO coaches (Registration, Seats)
             VALUES (%s, %s)""",
             (coach_reg_entry.value, seats_entry.value))
             conn.commit()
@@ -509,7 +514,7 @@ def open_add_coach_window():
             coaches_window.show()
 
         except mysql.connector.Error as err:
-            print(f"Datbase Error: {err}")
+            print(f"Database Error: {err}")
             info("Database Error", "There was an error when trying to add coach. Check Your Input")
 
 
@@ -517,6 +522,8 @@ def open_add_coach_window():
     back_button = PushButton(add_coach_window, text="Back", command=add_coach_window.destroy)
     add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+    add_coach_window.show()
+
 
 def open_add_customer_window():
     global add_customer_window
@@ -547,8 +554,9 @@ def open_add_customer_window():
 
     def add_customer():
         try:
+            # Corrected SQL query with correct column names
             cursor.execute("""
-                INSERT INTO customers (CustomerFirstName, CustomerSurname, CustomerEmail, AddressLine1,
+                INSERT INTO customers (FirstName, Surname, Email, AddressLine1,
                                        AddressLine2, City, Postcode, PhoneNumber, SpecialNotes)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (first_name_entry.value, surname_entry.value, email_entry.value,
@@ -594,8 +602,9 @@ def open_add_destination_window():
 
     def add_destination():
         try:
+            # Corrected SQL statement with correct column names
             cursor.execute("""
-            INSERT INTO destinations (DestinationName, Hotel, Cost, City, Days)
+            INSERT INTO destinations (DestinationName, Hotel, DestinationCost, CityName, Days)
             VALUES (%s, %s, %s, %s, %s)""",
             (destination_name_entry.value, hotel_name_entry.value, destination_cost_entry.value,
              city_name_entry.value, days_entry.value))
