@@ -845,7 +845,7 @@ def open_query_window():
         selection_window = Window(query_window, title="Select Trip", width=400, height=200, bg=BG_COLOR)
         Text(selection_window, text="Select Destination:", color=TEXT_COLOR)
 
-        # Use a Combo box for destinations.  MUCH better than hardcoding!
+        # Use a Combo box for destinations.
         destination_combo = Combo(selection_window, options=[], width="fill")  # Fill options later
         Text(selection_window, text="Enter Date (YYYY-MM-DD):", color=TEXT_COLOR)
         date_entry = TextBox(selection_window)
@@ -946,28 +946,52 @@ def open_query_window():
         except mysql.connector.Error as err:
             info("Database Error", f"Error fetching trip data: {err}")
 
-    # --- Query 3: Customers in SW1 postcode area ---
-    def sw1_customers():
-        try:
-            cursor.execute("""
-                SELECT FirstName, Surname, AddressLine1, AddressLine2, City, Postcode
-                FROM customers
-                WHERE Postcode LIKE 'SW1%'
-            """)
-            customers = cursor.fetchall()
+   # --- Query 3: Customers in a given postcode area ---
+    def postcode_customers():
+        # Create a sub-window to get postcode input
+        postcode_window = Window(query_window, title="Enter Postcode", width=300, height=150, bg=BG_COLOR)
+        Text(postcode_window, text="Enter Postcode:", color=TEXT_COLOR)
+        postcode_entry = TextBox(postcode_window)
 
-            result_window = Window(query_window, title="SW1 Customers", width=600, height=400, bg=BG_COLOR)
-            result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
-            if customers:
-                for customer in customers:
-                    result_list.append(f"{customer['FirstName']} {customer['Surname']}, {customer['AddressLine1']}, {customer['AddressLine2']}, {customer['City']}, {customer['Postcode']}")
-            else:
-                result_list.append("No customers found in SW1.")
-            close_button = PushButton(result_window, text = "Close", command = result_window.destroy)
-            close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR;
-            result_window.show()
-        except mysql.connector.Error as err:
-            info("Database Error", f"Error fetching customer data: {err}")
+        def run_postcode_query():
+            try:
+                postcode = postcode_entry.value
+
+                if not postcode:  # Check for empty input
+                    info("Input Error", "Please enter a postcode.")
+                    return
+
+                # Use parameterized query for safety!
+                cursor.execute("""
+                    SELECT FirstName, Surname, AddressLine1, AddressLine2, City, Postcode
+                    FROM customers
+                    WHERE Postcode LIKE %s
+                """, (postcode + '%',))  # Add % for wildcard matching
+                customers = cursor.fetchall()
+
+                result_window = Window(query_window, title=f"Customers in {postcode}", width=600, height=400, bg=BG_COLOR)
+                result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
+
+                if customers:
+                    for customer in customers:
+                        result_list.append(f"{customer['FirstName']} {customer['Surname']}, {customer['AddressLine1']}, {customer['AddressLine2']}, {customer['City']}, {customer['Postcode']}")
+                else:
+                    result_list.append(f"No customers found in {postcode}.")
+
+                close_button = PushButton(result_window, text="Close", command=result_window.destroy)
+                close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
+                result_window.show()
+                postcode_window.destroy()  # Close input window
+
+            except mysql.connector.Error as err:
+                info("Database Error", f"Error fetching customer data: {err}")
+
+        ok_button = PushButton(postcode_window, text="OK", command=run_postcode_query)
+        cancel_button = PushButton(postcode_window, text="Cancel", command=postcode_window.destroy)
+        ok_button.bg = BUTTON_BG_COLOR; ok_button.text_color = BUTTON_TEXT_COLOR
+        cancel_button.bg = BUTTON_BG_COLOR; cancel_button.text_color = BUTTON_TEXT_COLOR
+        postcode_window.show()
+
 
   # --- Query 4:  Current Income for a specific trip
     def trip_income_window():
@@ -1012,13 +1036,13 @@ def open_query_window():
     # --- Buttons for each query ---
     passengers_button = PushButton(query_window, text="Passengers by Trip", command=lincoln_passengers) # Changed text
     trips_button = PushButton(query_window, text="Available Trips", command=available_trips)
-    sw1_button = PushButton(query_window, text="SW1 Customers", command=sw1_customers)
+    postcode_button = PushButton(query_window, text="Customers by Postcode", command=postcode_customers)  # Changed text and command
     income_button = PushButton(query_window, text = "Calculate Trip Income", command = trip_income_window)
     back_button = PushButton(query_window, text="Back", command=query_window.destroy)
 
     passengers_button.bg = BUTTON_BG_COLOR; passengers_button.text_color = BUTTON_TEXT_COLOR
     trips_button.bg = BUTTON_BG_COLOR; trips_button.text_color = BUTTON_TEXT_COLOR
-    sw1_button.bg = BUTTON_BG_COLOR; sw1_button.text_color = BUTTON_TEXT_COLOR
+    postcode_button.bg = BUTTON_BG_COLOR;  postcode_button.text_color = BUTTON_TEXT_COLOR # Changed button
     income_button.bg = BUTTON_BG_COLOR; income_button.text_color = BUTTON_TEXT_COLOR;
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     query_window.show()
