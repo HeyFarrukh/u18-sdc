@@ -841,31 +841,84 @@ def open_query_window():
 
     # --- Query 1: Passengers on a specific trip ---
     def lincoln_passengers():
-      try:
-          # Added CityName for flexibility.
-          cursor.execute("""
-              SELECT c.FirstName, c.Surname
-              FROM customers c
-              JOIN bookings b ON c.CustomerID = b.CustomerID
-              JOIN trips t ON b.TripID = t.TripID
-              JOIN destinations d ON t.DestinationID = d.DestinationID
-              WHERE d.CityName = 'Lincoln' AND t.Date = '2024-12-19'
-          """)
-          passengers = cursor.fetchall()
+        # 1.  Create a sub-window for destination and date selection.
+        selection_window = Window(query_window, title="Select Trip", width=400, height=200, bg=BG_COLOR)
+        Text(selection_window, text="Select Destination:", color=TEXT_COLOR)
 
-          result_window = Window(query_window, title="Lincoln Passengers", width=400, height=300, bg=BG_COLOR)
-          result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
-          if passengers:
-              for passenger in passengers:
-                  result_list.append(f"{passenger['FirstName']} {passenger['Surname']}")
-          else:
-              result_list.append("No passengers found for this trip.")
-          close_button = PushButton(result_window, text="Close", command=result_window.destroy)
-          close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
-          result_window.show()
+        # Use a Combo box for destinations.  MUCH better than hardcoding!
+        destination_combo = Combo(selection_window, options=[], width="fill")  # Fill options later
+        Text(selection_window, text="Enter Date (YYYY-MM-DD):", color=TEXT_COLOR)
+        date_entry = TextBox(selection_window)
 
-      except mysql.connector.Error as err:
-          info("Database Error", f"Error fetching passenger data: {err}")
+        # 2. Populate the destination Combo box.
+        try:
+            cursor.execute("SELECT DestinationID, DestinationName FROM destinations")
+            destinations = cursor.fetchall()
+            destination_options = [f"{dest['DestinationID']}: {dest['DestinationName']}" for dest in destinations]
+
+            # CORRECTED: Clear existing options and append new ones.
+            destination_combo.clear()  # Clear any previous options (important!)
+            for option in destination_options:
+                destination_combo.append(option)
+
+        except mysql.connector.Error as err:
+            info("Database Error", f"Error fetching destinations: {err}")
+            selection_window.destroy()  # Close if we can't get destinations
+            return
+
+        # 3.  The function that actually executes the query (now with parameters).
+        def run_passenger_query():
+            try:
+                selected_destination = destination_combo.value
+                trip_date = date_entry.value
+
+                # Very important:  Error handling for empty input.
+                if not selected_destination or not trip_date:
+                    info("Input Error", "Please select a destination and enter a date.")
+                    return
+
+                # Extract DestinationID from the Combo selection
+                destination_id = int(selected_destination.split(":")[0])
+
+
+                # Corrected SQL query with parameters for destination and date.  SAFE.
+                cursor.execute("""
+                    SELECT c.FirstName, c.Surname
+                    FROM customers c
+                    JOIN bookings b ON c.CustomerID = b.CustomerID
+                    JOIN trips t ON b.TripID = t.TripID
+                    JOIN destinations d ON t.DestinationID = d.DestinationID
+                    WHERE d.DestinationID = %s AND t.Date = %s
+                """, (destination_id, trip_date))  # Use parameters!
+                passengers = cursor.fetchall()
+
+                result_window = Window(query_window, title="Passengers", width=400, height=300, bg=BG_COLOR)
+                result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
+                if passengers:
+                    for passenger in passengers:
+                        result_list.append(f"{passenger['FirstName']} {passenger['Surname']}")
+                else:
+                    result_list.append("No passengers found for this trip.")
+                close_button = PushButton(result_window, text="Close", command=result_window.destroy)
+                close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
+                result_window.show()
+                selection_window.destroy()  # Close selection window *after* showing results
+
+            except mysql.connector.Error as err:
+                info("Database Error", f"Error fetching passenger data: {err}")
+            except ValueError:  # Handle errors if the date isn't valid.
+                info("Input Error", "Invalid date format.  Please use YYYY-MM-DD.")
+            except IndexError:
+                info("Input Error", "Invalid destination selection")
+
+
+        # 4. Buttons within the selection window
+        ok_button = PushButton(selection_window, text="OK", command=run_passenger_query)
+        cancel_button = PushButton(selection_window, text="Cancel", command=selection_window.destroy)
+        ok_button.bg = BUTTON_BG_COLOR; ok_button.text_color = BUTTON_TEXT_COLOR
+        cancel_button.bg = BUTTON_BG_COLOR; cancel_button.text_color = BUTTON_TEXT_COLOR
+        selection_window.show()
+
 
     # --- Query 2: Available trips in chronological order ---
     def available_trips():
@@ -922,7 +975,7 @@ def open_query_window():
         income_window = Window(query_window, title = "Calculate Trip Income", width = 400, height = 200, bg = BG_COLOR)
         Text(income_window, text="Enter Trip ID:", color=TEXT_COLOR)
         trip_id_entry = TextBox(income_window)
-        
+
         #Function that takes the input value and runs the calculation.
         def calculate_income():
             try:
@@ -948,16 +1001,16 @@ def open_query_window():
                 info("Database Error", f"Error calculating income: {err}")
             finally: #Closes trip_income_window whether it runs the query or not.
                 income_window.destroy()
-                
+
         calculate_button = PushButton(income_window, text = "Calculate", command = calculate_income)
         cancel_button = PushButton(income_window, text = "Cancel", command = income_window.destroy)
         calculate_button.bg = BUTTON_BG_COLOR; calculate_button.text_color = BUTTON_TEXT_COLOR
         cancel_button.bg = BUTTON_BG_COLOR; cancel_button.text_color = BUTTON_TEXT_COLOR
         income_window.show()
-        
+
 
     # --- Buttons for each query ---
-    passengers_button = PushButton(query_window, text="Lincoln Passengers (19th Dec 2024)", command=lincoln_passengers)
+    passengers_button = PushButton(query_window, text="Passengers by Trip", command=lincoln_passengers) # Changed text
     trips_button = PushButton(query_window, text="Available Trips", command=available_trips)
     sw1_button = PushButton(query_window, text="SW1 Customers", command=sw1_customers)
     income_button = PushButton(query_window, text = "Calculate Trip Income", command = trip_income_window)
