@@ -614,7 +614,7 @@ def open_add_customer_window():
 
 def open_add_booking_window():
     global add_booking_window, customer_combo, trip_combo, booking_cost_entry, num_people_entry, special_request_entry, date_of_booking_entry
-    add_booking_window = Window(app, title="Add Booking", width=400, height=400, bg=BG_COLOR)
+    add_booking_window = Window(app, title="Add Booking", width=450, height=450, bg=BG_COLOR) #Increased window size
     Text(add_booking_window, text = "Enter Booking Details:", color = TEXT_COLOR)
 
     Text(add_booking_window, text="Customer:", color=TEXT_COLOR)
@@ -692,13 +692,30 @@ def open_add_booking_window():
                 return
             trip_id = int(selected_trip.split(":")[0]) # Extract ID
 
-            if not booking_cost_entry.value.isdigit():  # Or isdigit() if it must be an integer
+            if not booking_cost_entry.value.isdigit():
                 info("Input Error", "Booking cost must be a number.")
                 return
+            #Number of people validation (check against coach capacity)
             if not num_people_entry.value.isdigit():
                 info("Input Error", "Number of People must be an integer.")
                 return
-            # NO MORE manual date entry. Date is pre-set.
+            num_people = int(num_people_entry.value) # Convert to int for the check
+
+            cursor.execute("SELECT CoachID from trips WHERE TripID = %s", (trip_id,))
+            result = cursor.fetchone()
+            if result:
+                coach_id = result['CoachID']
+                cursor.execute("SELECT Seats from coaches WHERE CoachID = %s", (coach_id,))
+                result = cursor.fetchone()
+                if result:
+                    available_seats = result['Seats']
+                    if num_people > available_seats:
+                        info("Input Error", f"The selected coach only has {available_seats} seats.")
+                        return # Exit if not enough seats
+
+            else:
+                info("Database Error", "Could not retrieve coach information")
+
             # Date validation (basic format check) -- NO LONGER NEEDED, date is auto-set
             # date_pattern = r"^\d{4}-\d{2}-\d{2}$"  # YYYY-MM-DD
             # if not re.match(date_pattern, date_of_booking_entry.value):
