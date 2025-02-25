@@ -148,126 +148,212 @@ def get_all_trips():
 
 # --- Function to open a new window and display data ---
 def open_bookings_data_window():
-    """Opens a new window to display booking data."""
-    staff_bookings_window.hide() # Hide the previous window
-    global bookings_data_window # Make it global so back button can access it
-    bookings_data_window = Window(app, title="Booking Data", width=800, height=600, bg=BG_COLOR)
+    """Opens a new window to display booking data in a table."""
+    staff_bookings_window.hide()
+    global bookings_data_window
+    bookings_data_window = Window(app, title="Booking Data", width=900, height=600, bg=BG_COLOR)
     Text(bookings_data_window, text="All Bookings", color=TEXT_COLOR, size=14, font="Arial")
-    bookings_list = ListBox(bookings_data_window,  width="fill", height="fill", scrollbar=True) # ListBox in the new window
 
-    back_button_box = Box(bookings_data_window, layout="auto", width="fill") # Box for back button in data window
-    back_button = PushButton(back_button_box, text="Back to Bookings Menu", command=go_back_to_staff_bookings_menu_from_data)
-    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
-
+    # Use a ListBox with scrollbar (as in your original code), BUT format the output.
+    bookings_list = ListBox(bookings_data_window, width="fill", height="fill", scrollbar=True)
 
     bookings_data = get_all_bookings()
     if bookings_data:
+        # Create a header string with appropriate spacing
+        header = f"{'Booking ID':<10}{'Customer ID':<12}{'Trip ID':<8}{'Cost':<8}{'People':<8}{'Special Request':<30}{'Booking Date':<12}"  # Adjust spacing as needed
+        bookings_list.append(header) # Add the header as the first item.
+        bookings_list.append("-" * 80) #Separator
+
         for booking in bookings_data:
-            bookings_list.append(f"Booking ID: {booking['BookingID']}, Customer ID: {booking['CustomerID']}, Trip ID: {booking['TripID']}, Cost: {booking['BookingCost']}, People: {booking['NumberofPeople']}, Date: {booking['BookingDate']}")
+            # Use fixed-width formatting, as before, but now it's ONE string per row.
+            row_string = (f"{booking['BookingID']:<10}"
+                          f"{booking['CustomerID']:<12}"
+                          f"{booking['TripID']:<8}"
+                          f"£{booking['BookingCost']:<7}"  # Added £ and spacing
+                          f"{booking['NumberofPeople']:<8}"
+                          f"{booking['SpecialRequest'] or '':<30}"  # Handle None
+                          f"{booking['BookingDate']}") #Removed extra spaces
+
+            bookings_list.append(row_string) # Add the formatted row to the ListBox
     else:
         bookings_list.append("Could not retrieve booking data.")
+
+    back_button_box = Box(bookings_data_window, layout="auto", width="fill")
+    back_button = PushButton(back_button_box, text="Back to Bookings Menu", command=go_back_to_staff_bookings_menu_from_data)
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR;
     bookings_data_window.show()
 
+
 def open_customers_data_window():
-    customers_window.hide()
+    staff_customers_window.hide() #correct window
     global customers_data_window
-    customers_data_window = Window(app, title = "Customer Data", width = 800, height = 600, bg = BG_COLOR)
+    customers_data_window = Window(app, title = "Customer Data", width = 1100, height = 600, bg = BG_COLOR)  # Adjusted width
     Text(customers_data_window, text="All Customers", color = TEXT_COLOR, size = 14, font="Arial")
+
+    # Use a ListBox with built in scrollbar
     customers_list = ListBox(customers_data_window, width="fill", height="fill", scrollbar=True)
+
+    customers_data = get_all_customers()
+    if customers_data:
+        # Header
+        header = (f"{'Customer ID':<12}{'First Name':<15}{'Surname':<15}{'Email':<25}"
+                  f"{'Address Line 1':<25}{'Address Line 2':<25}{'City':<15}{'Postcode':<10}"
+                  f"{'Phone Number':<15}{'Notes':<20}")
+        customers_list.append(header)
+        customers_list.append("-" * 140)
+
+
+        for customer in customers_data:
+            # Corrected attribute names here
+            row_string = (f"{customer['CustomerID']:<12}"
+                           f"{customer['FirstName']:<15}"
+                           f"{customer['Surname']:<15}"
+                           f"{customer['Email']:<25}"
+                           f"{customer['AddressLine1']:<25}"
+                           f"{customer['AddressLine2'] or '':<25}"  # Handle None
+                           f"{customer['City']:<15}"
+                           f"{customer['Postcode']:<10}"
+                           f"{customer['PhoneNumber']:<15}"
+                           f"{customer['SpecialNotes'] or '':<20}") # Handle None
+            customers_list.append(row_string)
+
+    else:
+        customers_list.append("Could not retrieve customer data.")
 
     back_button_box = Box(customers_data_window, layout="auto", width="fill")
     back_button = PushButton(back_button_box, text = "Back to Customers Menu", command=go_back_to_admin_customers_menu_from_data)
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
-
-    customers_data = get_all_customers()
-    if customers_data:
-        for customer in customers_data:
-            # Corrected attribute names here
-            customers_list.append(f"Customer ID: {customer['CustomerID']}, Name: {customer['FirstName']} {customer['Surname']}, Email: {customer['Email']}, Address: {customer['AddressLine1']} {customer['AddressLine2']} {customer['City']} {customer['Postcode']}, Phone: {customer['PhoneNumber']}, Notes: {customer['SpecialNotes']}")
-    else:
-        customers_list.append("Could not retrieve customer data.")
     customers_data_window.show()
 
+
 def open_coaches_data_window():
-    coaches_window.hide()
+    admin_coaches_window.hide() #Correct window
     global coaches_data_window
     coaches_data_window = Window(app, title = "Coach Data", width = 800, height = 600, bg=BG_COLOR)
     Text(coaches_data_window, text="All Coaches", color=TEXT_COLOR, size = 14, font = "Arial")
+
     coaches_list = ListBox(coaches_data_window, width="fill", height="fill", scrollbar=True)
 
-    back_button_box = Box(coaches_data_window, layout="auto", width="fill")
-    back_button = PushButton(back_button_box, text="Back to Coaches Menu", command=go_back_to_admin_coaches_menu_from_data)
-    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+
+    # --- Header Row ---
+    header = f"{'Coach ID':<8}{'Registration':<15}{'Seats':<6}"
+    coaches_list.append(header)
+    coaches_list.append("-" * 30) #separator
 
     coaches_data = get_all_coaches()
     if coaches_data:
         for coach in coaches_data:
             # Corrected attribute names here
-            coaches_list.append(f"Coach ID: {coach['CoachID']}, Registration: {coach['Registration']}, Seats: {coach['Seats']}")
+            row_string = (f"{coach['CoachID']:<8}"
+                           f"{coach['Registration']:<15}"
+                           f"{coach['Seats']:<6}")
+            coaches_list.append(row_string)
+
     else:
         coaches_list.append("Could not retrieve coach data.")
+
+
+    back_button_box = Box(coaches_data_window, layout="auto", width="fill")
+    back_button = PushButton(back_button_box, text="Back to Coaches Menu", command=go_back_to_admin_coaches_menu_from_data)
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     coaches_data_window.show()
 
 def open_destinations_data_window():
-    destinations_window.hide()
+    admin_destinations_window.hide() #Correct window
     global destinations_data_window
     destinations_data_window = Window(app, title="Destination Data", width = 800, height=600, bg=BG_COLOR)
     Text(destinations_data_window, text="All Destinations", color = TEXT_COLOR, size=14, font="Arial")
+
     destinations_list = ListBox(destinations_data_window, width="fill", height="fill", scrollbar=True)
+
+    # --- Header Row ---
+    header = (f"{'Destination ID':<15}{'Name':<25}{'Hotel':<25}{'Cost':<8}{'City':<15}{'Days':<6}")
+    destinations_list.append(header)
+    destinations_list.append("-" * 90)
+
+    destinations_data = get_all_destinations()
+    if destinations_data:
+
+        for destination in destinations_data:
+             # Corrected attribute names here
+            row_string = (f"{destination['DestinationID']:<15}"
+                           f"{destination['DestinationName']:<25}"
+                           f"{destination['Hotel'] or '':<25}"  # Handle None.
+                           f"£{destination['DestinationCost']:<7}"   # Format as currency
+                           f"{destination['CityName']:<15}"
+                           f"{destination['Days']:<6}")
+            destinations_list.append(row_string)
+    else:
+        destinations_list.append("Could not retrieve destination data.")
+
 
     back_button_box = Box(destinations_data_window, layout="auto", width="fill")
     back_button = PushButton(back_button_box, text="Back to Destinations Menu", command=go_back_to_admin_destinations_menu_from_data)
     back_button.bg = BUTTON_BG_COLOR
     back_button.text_color = BUTTON_TEXT_COLOR
-
-    destinations_data = get_all_destinations()
-    if destinations_data:
-        for destination in destinations_data:
-             # Corrected attribute names here
-            destinations_list.append(f"Destination ID: {destination['DestinationID']}, Name: {destination['DestinationName']}, Hotel: {destination['Hotel']}, Cost: {destination['DestinationCost']}, City: {destination['CityName']}, Days: {destination['Days']}")
-    else:
-        destinations_list.append("Could not retrieve destination data.")
     destinations_data_window.show()
 
 def open_drivers_data_window():
-    drivers_window.hide()
+    admin_drivers_window.hide() #Correct Window
     global drivers_data_window
     drivers_data_window = Window(app, title="Driver Data", width=800, height=600, bg=BG_COLOR)
     Text(drivers_data_window, text="All Drivers", color = TEXT_COLOR, size=14, font="Arial")
+
+    # Use ListBox with scrollbar
     drivers_list = ListBox(drivers_data_window, width = "fill", height = "fill", scrollbar=True)
+
+    # --- Header row ---
+    header = f"{'Driver ID':<10}{'Driver Name':<20}"
+    drivers_list.append(header)
+    drivers_list.append("-" * 30)
+
+    drivers_data = get_all_drivers()
+    if drivers_data:
+        for driver in drivers_data:
+            drivers_list.append(f"{driver['DriverID']:<10}{driver['DriverName']:<20}")
+    else:
+        drivers_list.append("Could not retrieve driver data.")
+
 
     back_button_box = Box(drivers_data_window, layout="auto", width = "fill")
     back_button = PushButton(back_button_box, text="Back to Drivers Menu", command=go_back_to_admin_drivers_menu_from_data)
     back_button.bg = BUTTON_BG_COLOR
     back_button.text_color = BUTTON_TEXT_COLOR
-
-    drivers_data = get_all_drivers()
-    if drivers_data:
-        for driver in drivers_data:
-            drivers_list.append(f"Driver ID: {driver['DriverID']}, Name: {driver['DriverName']}")
-    else:
-        drivers_list.append("Could not retrieve driver data.")
     drivers_data_window.show()
 
 def open_trips_data_window():
-    staff_trips_window.hide()
+    staff_trips_window.hide() # Correct window
     global trips_data_window
     trips_data_window = Window(app, title = "Trip Data", width=800, height = 600, bg=BG_COLOR)
     Text(trips_data_window, text="All Trips", color=TEXT_COLOR, size=14, font="Arial")
     trips_list = ListBox(trips_data_window, width="fill", height = "fill", scrollbar=True)
+    
+    header = f"{'Trip ID':<8}{'Coach ID':<10}{'Driver ID':<10}{'Destination ID':<15}{'Date':<12}"
+    trips_list.append(header)
+    trips_list.append("-" * 60)
 
-    back_button_box = Box(trips_data_window, layout = "auto", width="fill")
-    back_button = PushButton(back_button_box, text="Back to Trips Menu", command=go_back_to_admin_trips_menu_from_data)
-    back_button.bg = BUTTON_BG_COLOR
-    back_button.text_color = BUTTON_TEXT_COLOR
 
     trips_data = get_all_trips()
     if trips_data:
+
         for trip in trips_data:
-            trips_list.append(f"Trip ID: {trip['TripID']}, Coach ID: {trip['CoachID']}, Driver ID: {trip['DriverID']}, Destination ID: {trip['DestinationID']}, Date: {trip['Date']}")
+            row_string = (f"{trip['TripID']:<8}"
+                          f"{trip['CoachID']:<10}"
+                          f"{trip['DriverID']:<10}"
+                          f"{trip['DestinationID']:<15}"
+                          f"{trip['Date']}")
+            trips_list.append(row_string)
+
     else:
         trips_list.append("Could not retrieve trip data.")
+
+
+    back_button_box = Box(trips_data_window, layout = "auto", width="fill")
+    back_button = PushButton(back_button_box, text="Back to Trips Menu", command=go_back_to_staff_main_from_trips)
+    back_button.bg = BUTTON_BG_COLOR
+    back_button.text_color = BUTTON_TEXT_COLOR
     trips_data_window.show()
+
 
 #region Admin Windows
 # --- Admin Window Functions ---
