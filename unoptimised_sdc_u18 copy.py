@@ -3,7 +3,7 @@ import mysql.connector
 from mysql.connector import errorcode
 
 
-# --- Database Configuration ---
+# --- Database Configuration---
 DB_HOST = "localhost"
 DB_USER = "root"
 DB_PASSWORD = "root"
