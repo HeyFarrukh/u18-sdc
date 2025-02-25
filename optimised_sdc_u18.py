@@ -567,6 +567,12 @@ def open_add_customer_window():
             if not email_entry.value:
                 info("Input Error", "Email is required.")
                 return
+            # Email validation using a regular expression (placed *after* empty check)
+            email = email_entry.value
+            email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            if not re.match(email_regex, email):
+                info("Input Error", "Invalid email format.")
+                return
             if not address1_entry.value:
                 info("Input Error", "Address Line 1 is required.")
                 return
@@ -579,13 +585,6 @@ def open_add_customer_window():
             if not phone_entry.value:
                 info("Input Error", "Phone Number is required.")
                 return
-
-            # Email validation using a regular expression
-            email = email_entry.value
-            email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-            if not re.match(email_regex, email):
-                info("Input Error", "Invalid email format.")
-                return  # Stop execution if the email is invalid
 
 
             # Corrected SQL query with correct column names
@@ -613,17 +612,47 @@ def open_add_customer_window():
     add_customer_window.show()
 
 
-
 def open_add_booking_window():
-    global add_booking_window, customer_id_entry, trip_id_entry, booking_cost_entry, num_people_entry, special_request_entry, date_of_booking_entry
+    global add_booking_window, customer_combo, trip_combo, booking_cost_entry, num_people_entry, special_request_entry, date_of_booking_entry
     add_booking_window = Window(app, title="Add Booking", width=400, height = 400, bg = BG_COLOR)
     Text(add_booking_window, text = "Enter Booking Details:", color = TEXT_COLOR)
 
-    Text(add_booking_window, text="Customer ID:", color=TEXT_COLOR)
-    customer_id_entry = TextBox(add_booking_window)
+    # Removed TextBox for Customer ID.  Added Combo.
+    Text(add_booking_window, text="Customer:", color=TEXT_COLOR)
+    customer_combo = Combo(add_booking_window, options=[], width="fill")
+    # Populate customer Combo
+    try:
+        cursor.execute("SELECT CustomerID, FirstName, Surname FROM customers")
+        customers = cursor.fetchall()
+        # Create a list of strings "ID: Name".  This is crucial.
+        customer_combo.clear()  # Clear any previous options (important!)
+        for customer in customers:
+            customer_combo.append(f"{customer['CustomerID']}: {customer['FirstName']} {customer['Surname']}")
 
-    Text(add_booking_window, text="Trip ID:", color=TEXT_COLOR)
-    trip_id_entry = TextBox(add_booking_window)
+    except mysql.connector.Error as err:
+        info("Database Error", "Could not load customers.")
+        add_booking_window.destroy()
+        return # Exit if we can't load customers
+
+    # Removed TextBox for Trip ID.  Added Combo.
+    Text(add_booking_window, text="Trip:", color=TEXT_COLOR)
+    trip_combo = Combo(add_booking_window, options=[], width="fill")
+    # Populate trip Combo
+    try:
+        cursor.execute("SELECT TripID, Date, DestinationID FROM trips")
+        trips = cursor.fetchall()
+        trip_options = []
+        for trip in trips:
+             cursor.execute("SELECT DestinationName FROM destinations WHERE DestinationID = %s", (trip['DestinationID'],))
+             des = cursor.fetchone()
+             trip_options.append(f"{trip['TripID']}: {trip['Date']} - {des['DestinationName']}")
+        trip_combo.clear() # Clear options. IMPORTANT
+        for option in trip_options:
+            trip_combo.append(option)
+    except mysql.connector.Error as err:
+        info("Database Error", f"Could not load Trips")
+        add_booking_window.destroy()
+        return
 
     Text(add_booking_window, text="Booking Cost:", color=TEXT_COLOR)
     booking_cost_entry = TextBox(add_booking_window)
@@ -641,13 +670,20 @@ def open_add_booking_window():
     def add_booking():
         try:
             # --- Input Validation ---
-            if not customer_id_entry.value.isdigit():
-                info("Input Error", "Customer ID must be a number.")
+            # Get selected CustomerID and TripID.  Handle potential errors.
+            selected_customer = customer_combo.value
+            if not selected_customer:
+                info("Input Error", "Please select a customer.")
                 return
-            if not trip_id_entry.value.isdigit():
-                info("Input Error", "Trip ID must be a number.")
+            customer_id = int(selected_customer.split(":")[0]) # Extract ID
+
+            selected_trip = trip_combo.value
+            if not selected_trip:
+                info("Input Error", "Please select a trip.")
                 return
-            if not booking_cost_entry.value.isdigit():  # Or isdigit() if it must be an integer
+            trip_id = int(selected_trip.split(":")[0]) # Extract ID
+
+            if not booking_cost_entry.value.isdigit():
                 info("Input Error", "Booking cost must be a number.")
                 return
             if not num_people_entry.value.isdigit():
@@ -658,12 +694,12 @@ def open_add_booking_window():
             if not re.match(date_pattern, date_of_booking_entry.value):
                 info("Input Error", "Invalid date format. Use YYYY-MM-DD.")
                 return
-            
+
             cursor.execute("""
             INSERT INTO bookings (CustomerID, TripID, BookingCost, NumberofPeople, SpecialRequest, BookingDate)
             VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            (customer_id_entry.value, trip_id_entry.value, booking_cost_entry.value,
+            (customer_id, trip_id, booking_cost_entry.value, # Use extracted IDs
              num_people_entry.value, special_request_entry.value, date_of_booking_entry.value))
             conn.commit()
             info("Booking Added", "The booking has been added.")
@@ -671,8 +707,12 @@ def open_add_booking_window():
             staff_bookings_window.show()
 
         except mysql.connector.Error as err:
-             info("Database Error",f"Error Adding booking to the database. Check Your Input")
+             info("Database Error",f"Error Adding booking to the database. Check Your Input: {err}")
              print(f"Database Error: {err}")
+        except ValueError:
+            info("Input Error", "Invalid ID format selected.")
+        except IndexError: # added to handle the case if split fails
+            info("Input Error", "Invalid selection.")
 
 
     add_button = PushButton(add_booking_window, text="Add Booking", command=add_booking)
@@ -680,6 +720,7 @@ def open_add_booking_window():
     add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     add_booking_window.show()
+
 
 def open_add_coach_window():
     global add_coach_window, coach_reg_entry, seats_entry
@@ -819,34 +860,77 @@ def open_add_driver_window():
     add_driver_window.show()
 
 def open_add_trip_window():
-    global add_trip_window, coach_id_entry, driver_id_entry, destination_id_entry, date_entry
+    global add_trip_window, coach_combo, driver_combo, destination_combo, date_entry
 
     add_trip_window = Window(app, title="Add Trip", width = 400, height = 400, bg = BG_COLOR)
     Text(add_trip_window, text = "Enter Trip Details: ", color = TEXT_COLOR)
 
-    Text(add_trip_window, text = "Coach ID:", color = TEXT_COLOR)
-    coach_id_entry = TextBox(add_trip_window)
+    Text(add_trip_window, text = "Coach:", color = TEXT_COLOR)
+    coach_combo = Combo(add_trip_window, options=[], width="fill")
+    #Populate the combo box
+    try:
+        cursor.execute("SELECT CoachID, Registration FROM coaches")
+        coaches = cursor.fetchall()
+        coach_combo.clear()
+        for coach in coaches:
+            coach_combo.append(f"{coach['CoachID']}: {coach['Registration']}")
+    except mysql.connector.Error as err:
+        info("Database Error", "Could not load coaches.")
+        add_trip_window.destroy()  #close window if error occurs
+        return # Exit if we cant load data
+    
 
-    Text(add_trip_window, text = "Driver ID:", color = TEXT_COLOR)
-    driver_id_entry = TextBox(add_trip_window)
+    Text(add_trip_window, text = "Driver:", color = TEXT_COLOR)
+    driver_combo = Combo(add_trip_window, options=[], width="fill")
+    #Populate Driver Combo
+    try:
+        cursor.execute("SELECT DriverID, DriverName FROM drivers")
+        drivers = cursor.fetchall()
+        driver_combo.clear() #clear options
+        for driver in drivers:
+            driver_combo.append(f"{driver['DriverID']}: {driver['DriverName']}")
+    except mysql.connector.Error as err:
+        info("Database Error", "Could not load drivers")
+        add_trip_window.destroy()
+        return
 
-    Text(add_trip_window, text="Destination ID:", color=TEXT_COLOR)
-    destination_id_entry = TextBox(add_trip_window)
+    Text(add_trip_window, text="Destination:", color=TEXT_COLOR)
+    destination_combo = Combo(add_trip_window, options=[], width="fill")
+     #Populate Destination Combo
+    try:
+        cursor.execute("SELECT DestinationID, DestinationName FROM destinations")
+        destinations = cursor.fetchall()
+        destination_combo.clear()
+        for destination in destinations:
+            destination_combo.append(f"{destination['DestinationID']}: {destination['DestinationName']}")
+    except mysql.connector.Error as err:
+        info("Database Error", "Could not load destinations")
+        add_trip_window.destroy()
+        return
+    
 
     Text(add_trip_window, text = "Date (YYYY-MM-DD):", color = TEXT_COLOR)
     date_entry = TextBox(add_trip_window)
 
     def add_trip():
         try:
-            if not coach_id_entry.value.isdigit():
-                info("Input Error", "Coach ID must be a number.")
+            selected_coach = coach_combo.value
+            if not selected_coach:
+                info("Input Error", "Please select a coach.")
                 return
-            if not driver_id_entry.value.isdigit():
-                info("Input Error", "Driver ID must be a number.")
+            coach_id = int(selected_coach.split(":")[0])
+
+            selected_driver = driver_combo.value
+            if not selected_driver:
+                info("Input Error", "Please select a driver.")
                 return
-            if not destination_id_entry.value.isdigit():
-                info("Input Error", "Destination ID must be a number.")
+            driver_id = int(selected_driver.split(":")[0])
+
+            selected_destination = destination_combo.value
+            if not selected_destination:
+                info("Input Error", "Please select a destination")
                 return
+            destination_id = int(selected_destination.split(":")[0])
             # Basic date format check.  Could be more robust.
             date_pattern = r"^\d{4}-\d{2}-\d{2}$"  # YYYY-MM-DD
             if not re.match(date_pattern, date_entry.value):
@@ -856,7 +940,7 @@ def open_add_trip_window():
             cursor.execute("""
             INSERT INTO trips (CoachID, DriverID, DestinationID, Date)
             VALUES (%s, %s, %s, %s)""",
-            (coach_id_entry.value, driver_id_entry.value, destination_id_entry.value, date_entry.value))
+            (coach_id, driver_id, destination_id, date_entry.value))
             conn.commit()
             info("Success", "Trip has been added successfully.")
             add_trip_window.destroy()
@@ -865,6 +949,10 @@ def open_add_trip_window():
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
             info("Database Error", "Failed to add Trip. Check Your Input")
+        except ValueError:
+            info("Input Error", "Invalid ID format selected.")
+        except IndexError:
+            info("Input Error", "Invalid selection.")
 
     add_button = PushButton(add_trip_window, text = "Add Trip", command = add_trip)
     back_button = PushButton(add_trip_window, text = "Back", command = add_trip_window.destroy)
