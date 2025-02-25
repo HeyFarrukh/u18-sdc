@@ -557,12 +557,36 @@ def open_add_customer_window():
 
     def add_customer():
         try:
+            # --- Input Validation ---
+            if not first_name_entry.value:
+                info("Input Error", "First Name is required.")
+                return
+            if not surname_entry.value:
+                info("Input Error", "Surname is required.")
+                return
+            if not email_entry.value:
+                info("Input Error", "Email is required.")
+                return
+            if not address1_entry.value:
+                info("Input Error", "Address Line 1 is required.")
+                return
+            if not city_entry.value:
+                info("Input Error", "City is required.")
+                return
+            if not postcode_entry.value:
+                info("Input Error", "Postcode is required.")
+                return
+            if not phone_entry.value:
+                info("Input Error", "Phone Number is required.")
+                return
+
             # Email validation using a regular expression
             email = email_entry.value
             email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
             if not re.match(email_regex, email):
                 info("Input Error", "Invalid email format.")
                 return  # Stop execution if the email is invalid
+
 
             # Corrected SQL query with correct column names
             cursor.execute("""
@@ -575,7 +599,7 @@ def open_add_customer_window():
             conn.commit()
             info("Success", "Customer added successfully.")
             add_customer_window.destroy()
-            staff_customers_window.show() 
+            staff_customers_window.show()  # or admin
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
             info("Database Error", "Failed to add customer. Check Your Input")
@@ -587,6 +611,116 @@ def open_add_customer_window():
     back_button.bg = BUTTON_BG_COLOR
     back_button.text_color = BUTTON_TEXT_COLOR
     add_customer_window.show()
+
+
+
+def open_add_booking_window():
+    global add_booking_window, customer_id_entry, trip_id_entry, booking_cost_entry, num_people_entry, special_request_entry, date_of_booking_entry
+    add_booking_window = Window(app, title="Add Booking", width=400, height = 400, bg = BG_COLOR)
+    Text(add_booking_window, text = "Enter Booking Details:", color = TEXT_COLOR)
+
+    Text(add_booking_window, text="Customer ID:", color=TEXT_COLOR)
+    customer_id_entry = TextBox(add_booking_window)
+
+    Text(add_booking_window, text="Trip ID:", color=TEXT_COLOR)
+    trip_id_entry = TextBox(add_booking_window)
+
+    Text(add_booking_window, text="Booking Cost:", color=TEXT_COLOR)
+    booking_cost_entry = TextBox(add_booking_window)
+
+    Text(add_booking_window, text="Number of People:", color=TEXT_COLOR)
+    num_people_entry = TextBox(add_booking_window)
+
+    Text(add_booking_window, text="Special Request:", color=TEXT_COLOR)
+    special_request_entry = TextBox(add_booking_window)
+
+    Text(add_booking_window, text="Date of Booking (YYYY-MM-DD):", color=TEXT_COLOR)
+    date_of_booking_entry = TextBox(add_booking_window)
+
+    # Function for adding booking.
+    def add_booking():
+        try:
+            # --- Input Validation ---
+            if not customer_id_entry.value.isdigit():
+                info("Input Error", "Customer ID must be a number.")
+                return
+            if not trip_id_entry.value.isdigit():
+                info("Input Error", "Trip ID must be a number.")
+                return
+            if not booking_cost_entry.value.isdigit():  # Or isdigit() if it must be an integer
+                info("Input Error", "Booking cost must be a number.")
+                return
+            if not num_people_entry.value.isdigit():
+                info("Input Error", "Number of People must be an integer.")
+                return
+            # Date validation (basic format check)
+            date_pattern = r"^\d{4}-\d{2}-\d{2}$"  # YYYY-MM-DD
+            if not re.match(date_pattern, date_of_booking_entry.value):
+                info("Input Error", "Invalid date format. Use YYYY-MM-DD.")
+                return
+            
+            cursor.execute("""
+            INSERT INTO bookings (CustomerID, TripID, BookingCost, NumberofPeople, SpecialRequest, BookingDate)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (customer_id_entry.value, trip_id_entry.value, booking_cost_entry.value,
+             num_people_entry.value, special_request_entry.value, date_of_booking_entry.value))
+            conn.commit()
+            info("Booking Added", "The booking has been added.")
+            add_booking_window.destroy()
+            staff_bookings_window.show()
+
+        except mysql.connector.Error as err:
+             info("Database Error",f"Error Adding booking to the database. Check Your Input")
+             print(f"Database Error: {err}")
+
+
+    add_button = PushButton(add_booking_window, text="Add Booking", command=add_booking)
+    back_button = PushButton(add_booking_window, text="Back", command=add_booking_window.destroy)
+    add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+    add_booking_window.show()
+
+def open_add_coach_window():
+    global add_coach_window, coach_reg_entry, seats_entry
+    add_coach_window = Window(app, title = "Add Coach", width = 400, height = 400, bg = BG_COLOR)
+    Text(add_coach_window, text="Enter Coach Details:", color = TEXT_COLOR)
+
+    Text(add_coach_window, text = "Coach Registration:", color = TEXT_COLOR)
+    coach_reg_entry = TextBox(add_coach_window)
+
+    Text(add_coach_window, text="Seats in Coach", color = TEXT_COLOR)
+    seats_entry = TextBox(add_coach_window)
+
+    def add_coach():
+        try:
+
+            if not coach_reg_entry.value:
+                info("Input Error", "Coach Registration Required")
+                return
+            if not seats_entry.value.isdigit():
+                info("Input Error", "Number of seats must be a number")
+                return
+            # Corrected SQL query
+            cursor.execute("""
+            INSERT INTO coaches (Registration, Seats)
+            VALUES (%s, %s)""",
+            (coach_reg_entry.value, seats_entry.value))
+            conn.commit()
+            info("Coach Added", "The coach has been added to the database.")
+            add_coach_window.destroy()
+            coaches_window.show()
+
+        except mysql.connector.Error as err:
+            print(f"Database Error: {err}")
+            info("Database Error", "There was an error when trying to add coach. Check Your Input")
+
+
+    add_button = PushButton(add_coach_window, text="Add Coach", command=add_coach)
+    back_button = PushButton(add_coach_window, text="Back", command=add_coach_window.destroy)
+    add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+    add_coach_window.show()
 
 def open_add_destination_window():
     global add_destination_window, destination_name_entry, hotel_name_entry
@@ -612,6 +746,24 @@ def open_add_destination_window():
 
     def add_destination():
         try:
+            # --- Input Validation ---
+            if not destination_name_entry.value:
+                info("Input Error", "Destination Name is required.")
+                return
+            if not hotel_name_entry.value:
+                info("Input Error", "Hotel Name is required.")
+                return
+            if not destination_cost_entry.value.isdigit():
+                info("Input Error", "Destination Cost must be a number.")
+                return
+            if not city_name_entry.value:
+                info("Input Error", "City Name is required.")
+                return
+            if not days_entry.value.isdigit():
+                info("Input Error", "Days must be a number.")
+                return
+
+
             # Corrected SQL statement with correct column names
             cursor.execute("""
             INSERT INTO destinations (DestinationName, Hotel, DestinationCost, CityName, Days)
@@ -644,6 +796,10 @@ def open_add_driver_window():
 
     def add_driver():
         try:
+            if not driver_name_entry.value:
+                info("Input Error", "Driver name is required")
+                return # Stop execution
+            
             cursor.execute("""
             INSERT INTO drivers (DriverName)
             VALUES (%s)""", (driver_name_entry.value,))
@@ -682,6 +838,21 @@ def open_add_trip_window():
 
     def add_trip():
         try:
+            if not coach_id_entry.value.isdigit():
+                info("Input Error", "Coach ID must be a number.")
+                return
+            if not driver_id_entry.value.isdigit():
+                info("Input Error", "Driver ID must be a number.")
+                return
+            if not destination_id_entry.value.isdigit():
+                info("Input Error", "Destination ID must be a number.")
+                return
+            # Basic date format check.  Could be more robust.
+            date_pattern = r"^\d{4}-\d{2}-\d{2}$"  # YYYY-MM-DD
+            if not re.match(date_pattern, date_entry.value):
+                 info("Input Error", "Invalid date format. Use YYYY-MM-DD.")
+                 return
+
             cursor.execute("""
             INSERT INTO trips (CoachID, DriverID, DestinationID, Date)
             VALUES (%s, %s, %s, %s)""",
