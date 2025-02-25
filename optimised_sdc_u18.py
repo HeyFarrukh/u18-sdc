@@ -1,6 +1,7 @@
 from guizero import App, Text, PushButton, TextBox, Window, info, Picture, Combo, Box, ListBox
 import mysql.connector
 from mysql.connector import errorcode
+import re
 
 
 # --- Database Configuration ---
@@ -556,6 +557,13 @@ def open_add_customer_window():
 
     def add_customer():
         try:
+            # Email validation using a regular expression
+            email = email_entry.value
+            email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            if not re.match(email_regex, email):
+                info("Input Error", "Invalid email format.")
+                return  # Stop execution if the email is invalid
+
             # Corrected SQL query with correct column names
             cursor.execute("""
                 INSERT INTO customers (FirstName, Surname, Email, AddressLine1,
@@ -567,7 +575,7 @@ def open_add_customer_window():
             conn.commit()
             info("Success", "Customer added successfully.")
             add_customer_window.destroy()
-            staff_customers_window.show()  # or admin, depending on context
+            staff_customers_window.show() 
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
             info("Database Error", "Failed to add customer. Check Your Input")
