@@ -614,7 +614,7 @@ def open_add_customer_window():
 
 def open_add_booking_window():
     global add_booking_window, customer_combo, trip_combo, booking_cost_entry, num_people_entry, special_request_entry, date_of_booking_entry
-    add_booking_window = Window(app, title="Add Booking", width=400, height = 400, bg = BG_COLOR)
+    add_booking_window = Window(app, title="Add Booking", width=400, height=400, bg=BG_COLOR)
     Text(add_booking_window, text = "Enter Booking Details:", color = TEXT_COLOR)
 
     Text(add_booking_window, text="Customer:", color=TEXT_COLOR)
@@ -637,7 +637,7 @@ def open_add_booking_window():
     try:
         # IMPORTANT: Only show future trips
         cursor.execute("""
-            SELECT t.TripID, t.Date, d.DestinationName
+            SELECT t.TripID, t.Date, d.DestinationName, d.DestinationID
             FROM trips t
             JOIN destinations d ON t.DestinationID = d.DestinationID
             WHERE t.Date >= CURDATE()
@@ -652,8 +652,10 @@ def open_add_booking_window():
         add_booking_window.destroy()
         return
 
+    #  Booking Cost TextBox
     Text(add_booking_window, text="Booking Cost:", color=TEXT_COLOR)
     booking_cost_entry = TextBox(add_booking_window)
+
 
     Text(add_booking_window, text="Number of People:", color=TEXT_COLOR)
     num_people_entry = TextBox(add_booking_window)
@@ -661,8 +663,17 @@ def open_add_booking_window():
     Text(add_booking_window, text="Special Request:", color=TEXT_COLOR)
     special_request_entry = TextBox(add_booking_window)
 
-    Text(add_booking_window, text="Date of Booking (YYYY-MM-DD):", color=TEXT_COLOR)
-    date_of_booking_entry = TextBox(add_booking_window)
+    # REMOVE manual date entry, set to today's date automatically
+    Text(add_booking_window, text="Date of Booking:", color=TEXT_COLOR)
+    date_of_booking_entry = Text(add_booking_window, text = "")  # Display-only Text widget
+    # date_of_booking_entry = TextBox(add_booking_window) # Removed.
+
+    import datetime  # Make sure datetime is imported at the top
+
+    # Set the current date
+    current_date = datetime.date.today().strftime("%Y-%m-%d")
+    date_of_booking_entry.value = current_date  # guizero Text objects use .value
+
 
     # Function for adding booking.
     def add_booking():
@@ -687,18 +698,19 @@ def open_add_booking_window():
             if not num_people_entry.value.isdigit():
                 info("Input Error", "Number of People must be an integer.")
                 return
-            # Date validation (basic format check)
-            date_pattern = r"^\d{4}-\d{2}-\d{2}$"  # YYYY-MM-DD
-            if not re.match(date_pattern, date_of_booking_entry.value):
-                info("Input Error", "Invalid date format. Use YYYY-MM-DD.")
-                return
+            # NO MORE manual date entry. Date is pre-set.
+            # Date validation (basic format check) -- NO LONGER NEEDED, date is auto-set
+            # date_pattern = r"^\d{4}-\d{2}-\d{2}$"  # YYYY-MM-DD
+            # if not re.match(date_pattern, date_of_booking_entry.value):
+            #     info("Input Error", "Invalid date format. Use YYYY-MM-DD.")
+            #     return
 
             cursor.execute("""
             INSERT INTO bookings (CustomerID, TripID, BookingCost, NumberofPeople, SpecialRequest, BookingDate)
             VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            (customer_id, trip_id, booking_cost_entry.value,  # Use extracted IDs
-             num_people_entry.value, special_request_entry.value, date_of_booking_entry.value))
+            (customer_id, trip_id, booking_cost_entry.value,  # Use entered cost
+             num_people_entry.value, special_request_entry.value, current_date)) # Use current_date
             conn.commit()
             info("Booking Added", "The booking has been added.")
             add_booking_window.destroy()
