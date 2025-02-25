@@ -185,7 +185,7 @@ def open_bookings_data_window():
 
 
 def open_customers_data_window():
-    staff_customers_window.hide() #correct window
+    customers_window.hide() #correct window
     global customers_data_window
     customers_data_window = Window(app, title = "Customer Data", width = 1100, height = 600, bg = BG_COLOR)  # Adjusted width
     Text(customers_data_window, text="All Customers", color = TEXT_COLOR, size = 14, font="Arial")
@@ -227,7 +227,7 @@ def open_customers_data_window():
 
 
 def open_coaches_data_window():
-    admin_coaches_window.hide() #Correct window
+    coaches_window.hide() #Correct window
     global coaches_data_window
     coaches_data_window = Window(app, title = "Coach Data", width = 800, height = 600, bg=BG_COLOR)
     Text(coaches_data_window, text="All Coaches", color=TEXT_COLOR, size = 14, font = "Arial")
@@ -259,7 +259,7 @@ def open_coaches_data_window():
     coaches_data_window.show()
 
 def open_destinations_data_window():
-    admin_destinations_window.hide() #Correct window
+    destinations_window.hide() #Correct window
     global destinations_data_window
     destinations_data_window = Window(app, title="Destination Data", width = 800, height=600, bg=BG_COLOR)
     Text(destinations_data_window, text="All Destinations", color = TEXT_COLOR, size=14, font="Arial")
@@ -294,7 +294,7 @@ def open_destinations_data_window():
     destinations_data_window.show()
 
 def open_drivers_data_window():
-    admin_drivers_window.hide() #Correct Window
+    drivers_window.hide() #Correct Window
     global drivers_data_window
     drivers_data_window = Window(app, title="Driver Data", width=800, height=600, bg=BG_COLOR)
     Text(drivers_data_window, text="All Drivers", color = TEXT_COLOR, size=14, font="Arial")
