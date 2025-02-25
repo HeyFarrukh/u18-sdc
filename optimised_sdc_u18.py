@@ -617,40 +617,38 @@ def open_add_booking_window():
     add_booking_window = Window(app, title="Add Booking", width=400, height = 400, bg = BG_COLOR)
     Text(add_booking_window, text = "Enter Booking Details:", color = TEXT_COLOR)
 
-    # Removed TextBox for Customer ID.  Added Combo.
     Text(add_booking_window, text="Customer:", color=TEXT_COLOR)
     customer_combo = Combo(add_booking_window, options=[], width="fill")
     # Populate customer Combo
     try:
         cursor.execute("SELECT CustomerID, FirstName, Surname FROM customers")
         customers = cursor.fetchall()
-        # Create a list of strings "ID: Name".  This is crucial.
-        customer_combo.clear()  # Clear any previous options (important!)
+        customer_combo.clear()
         for customer in customers:
-            customer_combo.append(f"{customer['CustomerID']}: {customer['FirstName']} {customer['Surname']}")
-
+             customer_combo.append(f"{customer['CustomerID']}: {customer['FirstName']} {customer['Surname']}")
     except mysql.connector.Error as err:
         info("Database Error", "Could not load customers.")
         add_booking_window.destroy()
-        return # Exit if we can't load customers
+        return  # Exit the function
 
-    # Removed TextBox for Trip ID.  Added Combo.
     Text(add_booking_window, text="Trip:", color=TEXT_COLOR)
     trip_combo = Combo(add_booking_window, options=[], width="fill")
-    # Populate trip Combo
+     # Populate trip Combo
     try:
-        cursor.execute("SELECT TripID, Date, DestinationID FROM trips")
+        # IMPORTANT: Only show future trips
+        cursor.execute("""
+            SELECT t.TripID, t.Date, d.DestinationName
+            FROM trips t
+            JOIN destinations d ON t.DestinationID = d.DestinationID
+            WHERE t.Date >= CURDATE()
+            ORDER BY t.Date
+        """)
         trips = cursor.fetchall()
-        trip_options = []
+        trip_combo.clear() #clear options
         for trip in trips:
-             cursor.execute("SELECT DestinationName FROM destinations WHERE DestinationID = %s", (trip['DestinationID'],))
-             des = cursor.fetchone()
-             trip_options.append(f"{trip['TripID']}: {trip['Date']} - {des['DestinationName']}")
-        trip_combo.clear() # Clear options. IMPORTANT
-        for option in trip_options:
-            trip_combo.append(option)
+            trip_combo.append(f"{trip['TripID']}: {trip['Date']} - {trip['DestinationName']}")
     except mysql.connector.Error as err:
-        info("Database Error", f"Could not load Trips")
+        info("Database Error", "Could not load trips.")
         add_booking_window.destroy()
         return
 
@@ -683,7 +681,7 @@ def open_add_booking_window():
                 return
             trip_id = int(selected_trip.split(":")[0]) # Extract ID
 
-            if not booking_cost_entry.value.isdigit():
+            if not booking_cost_entry.value.isdigit():  # Or isdigit() if it must be an integer
                 info("Input Error", "Booking cost must be a number.")
                 return
             if not num_people_entry.value.isdigit():
@@ -699,7 +697,7 @@ def open_add_booking_window():
             INSERT INTO bookings (CustomerID, TripID, BookingCost, NumberofPeople, SpecialRequest, BookingDate)
             VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            (customer_id, trip_id, booking_cost_entry.value, # Use extracted IDs
+            (customer_id, trip_id, booking_cost_entry.value,  # Use extracted IDs
              num_people_entry.value, special_request_entry.value, date_of_booking_entry.value))
             conn.commit()
             info("Booking Added", "The booking has been added.")
@@ -707,7 +705,7 @@ def open_add_booking_window():
             staff_bookings_window.show()
 
         except mysql.connector.Error as err:
-             info("Database Error",f"Error Adding booking to the database. Check Your Input: {err}")
+             info("Database Error",f"Error Adding booking to the database. Check Your Input: {err}") #better error
              print(f"Database Error: {err}")
         except ValueError:
             info("Input Error", "Invalid ID format selected.")
