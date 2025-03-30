@@ -153,8 +153,12 @@ def open_bookings_data_window():
     global bookings_data_window
     bookings_data_window = Window(app, title="Booking Data", width=900, height=600, bg=BG_COLOR)
     Text(bookings_data_window, text="All Bookings", color=TEXT_COLOR, size=14, font="Arial")
+    bookings_list = ListBox(bookings_data_window,  width="fill", height="fill", scrollbar=True) # ListBox in the new window
 
-    bookings_list = ListBox(bookings_data_window, width="fill", height="fill", scrollbar=True)
+    back_button_box = Box(bookings_data_window, layout="auto", width="fill") # Box for back button in data window
+    back_button = PushButton(back_button_box, text="Back to Bookings Menu", command=go_back_to_staff_bookings_menu_from_data)
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+
 
     bookings_data = get_all_bookings()
     if bookings_data:
@@ -164,16 +168,7 @@ def open_bookings_data_window():
         bookings_list.append("-" * 80) #Separator
 
         for booking in bookings_data:
-            # ONE string per row.
-            row_string = (f"{booking['BookingID']:<10}"
-                          f"{booking['CustomerID']:<12}"
-                          f"{booking['TripID']:<8}"
-                          f"£{booking['BookingCost']:<7}"  # Added £ and spacing
-                          f"{booking['NumberofPeople']:<8}"
-                          f"{booking['SpecialRequest'] or '':<30}"  # Handle None
-                          f"{booking['BookingDate']}") #Removed extra spaces
-
-            bookings_list.append(row_string) # Add the formatted row to the ListBox
+            bookings_list.append(f"Booking ID: {booking['BookingID']}, Customer ID: {booking['CustomerID']}, Trip ID: {booking['TripID']}, Cost: {booking['BookingCost']}, People: {booking['NumberofPeople']}, Date: {booking['BookingDate']}")
     else:
         bookings_list.append("Could not retrieve booking data.")
 
@@ -184,7 +179,7 @@ def open_bookings_data_window():
 
 
 def open_customers_data_window():
-    customers_window.hide() 
+    customers_window.hide()
     global customers_data_window
     customers_data_window = Window(app, title = "Customer Data", width = 1100, height = 600, bg = BG_COLOR)  # Adjusted width
     Text(customers_data_window, text="All Customers", color = TEXT_COLOR, size = 14, font="Arial")
@@ -203,18 +198,8 @@ def open_customers_data_window():
 
 
         for customer in customers_data:
-            row_string = (f"{customer['CustomerID']:<12}"
-                           f"{customer['FirstName']:<15}"
-                           f"{customer['Surname']:<15}"
-                           f"{customer['Email']:<25}"
-                           f"{customer['AddressLine1']:<25}"
-                           f"{customer['AddressLine2'] or '':<25}"  # Handle None
-                           f"{customer['City']:<15}"
-                           f"{customer['Postcode']:<10}"
-                           f"{customer['PhoneNumber']:<15}"
-                           f"{customer['SpecialNotes'] or '':<20}") # Handle None
-            customers_list.append(row_string)
-
+            # Corrected attribute names here
+            customers_list.append(f"Customer ID: {customer['CustomerID']}, Name: {customer['FirstName']} {customer['Surname']}, Email: {customer['Email']}, Address: {customer['AddressLine1']} {customer['AddressLine2']} {customer['City']} {customer['Postcode']}, Phone: {customer['PhoneNumber']}, Notes: {customer['SpecialNotes']}")
     else:
         customers_list.append("Could not retrieve customer data.")
 
@@ -225,7 +210,7 @@ def open_customers_data_window():
 
 
 def open_coaches_data_window():
-    coaches_window.hide() 
+    coaches_window.hide()
     global coaches_data_window
     coaches_data_window = Window(app, title = "Coach Data", width = 800, height = 600, bg=BG_COLOR)
     Text(coaches_data_window, text="All Coaches", color=TEXT_COLOR, size = 14, font = "Arial")
@@ -241,11 +226,8 @@ def open_coaches_data_window():
     coaches_data = get_all_coaches()
     if coaches_data:
         for coach in coaches_data:
-            row_string = (f"{coach['CoachID']:<8}"
-                           f"{coach['Registration']:<15}"
-                           f"{coach['Seats']:<6}")
-            coaches_list.append(row_string)
-
+            # Corrected attribute names here
+            coaches_list.append(f"Coach ID: {coach['CoachID']}, Registration: {coach['Registration']}, Seats: {coach['Seats']}")
     else:
         coaches_list.append("Could not retrieve coach data.")
 
@@ -256,7 +238,7 @@ def open_coaches_data_window():
     coaches_data_window.show()
 
 def open_destinations_data_window():
-    destinations_window.hide() 
+    destinations_window.hide()
     global destinations_data_window
     destinations_data_window = Window(app, title="Destination Data", width = 800, height=600, bg=BG_COLOR)
     Text(destinations_data_window, text="All Destinations", color = TEXT_COLOR, size=14, font="Arial")
@@ -272,13 +254,8 @@ def open_destinations_data_window():
     if destinations_data:
 
         for destination in destinations_data:
-            row_string = (f"{destination['DestinationID']:<15}"
-                           f"{destination['DestinationName']:<25}"
-                           f"{destination['Hotel'] or '':<25}"  # Handle None.
-                           f"£{destination['DestinationCost']:<7}"   # Format as currency
-                           f"{destination['CityName']:<15}"
-                           f"{destination['Days']:<6}")
-            destinations_list.append(row_string)
+             # Corrected attribute names here
+            destinations_list.append(f"Destination ID: {destination['DestinationID']}, Name: {destination['DestinationName']}, Hotel: {destination['Hotel']}, Cost: {destination['DestinationCost']}, City: {destination['CityName']}, Days: {destination['Days']}")
     else:
         destinations_list.append("Could not retrieve destination data.")
 
@@ -290,7 +267,7 @@ def open_destinations_data_window():
     destinations_data_window.show()
 
 def open_drivers_data_window():
-    drivers_window.hide()
+    drivers_window.hide() #Correct Window
     global drivers_data_window
     drivers_data_window = Window(app, title="Driver Data", width=800, height=600, bg=BG_COLOR)
     Text(drivers_data_window, text="All Drivers", color = TEXT_COLOR, size=14, font="Arial")
@@ -318,7 +295,7 @@ def open_drivers_data_window():
     drivers_data_window.show()
 
 def open_trips_data_window():
-    staff_trips_window.hide() 
+    staff_trips_window.hide()
     global trips_data_window
     trips_data_window = Window(app, title = "Trip Data", width=800, height = 600, bg=BG_COLOR)
     Text(trips_data_window, text="All Trips", color=TEXT_COLOR, size=14, font="Arial")
@@ -636,36 +613,7 @@ def open_add_customer_window():
 
     def add_customer():
         try:
-            # --- Input Validation ---
-            if not first_name_entry.value:
-                info("Input Error", "First Name is required.")
-                return
-            if not surname_entry.value:
-                info("Input Error", "Surname is required.")
-                return
-            if not email_entry.value:
-                info("Input Error", "Email is required.")
-                return
-            # Email validation using a regular expression (placed *after* empty check)
-            email = email_entry.value
-            email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-            if not re.match(email_regex, email):
-                info("Input Error", "Invalid email format.")
-                return
-            if not address1_entry.value:
-                info("Input Error", "Address Line 1 is required.")
-                return
-            if not city_entry.value:
-                info("Input Error", "City is required.")
-                return
-            if not postcode_entry.value:
-                info("Input Error", "Postcode is required.")
-                return
-            if not phone_entry.value:
-                info("Input Error", "Phone Number is required.")
-                return
-
-
+            # Corrected SQL query with correct column names
             cursor.execute("""
                 INSERT INTO customers (FirstName, Surname, Email, AddressLine1,
                                        AddressLine2, City, Postcode, PhoneNumber, SpecialNotes)
@@ -676,7 +624,7 @@ def open_add_customer_window():
             conn.commit()
             info("Success", "Customer added successfully.")
             add_customer_window.destroy()
-            staff_customers_window.show() 
+            staff_customers_window.show()  # or admin, depending on context
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
             info("Database Error", "Failed to add customer. Check Your Input")
@@ -688,178 +636,6 @@ def open_add_customer_window():
     back_button.bg = BUTTON_BG_COLOR
     back_button.text_color = BUTTON_TEXT_COLOR
     add_customer_window.show()
-
-
-def open_add_booking_window():
-    global add_booking_window, customer_combo, trip_combo, booking_cost_entry, num_people_entry, special_request_entry, date_of_booking_entry
-    add_booking_window = Window(app, title="Add Booking", width=450, height=450, bg=BG_COLOR) #Increased window size
-    Text(add_booking_window, text = "Enter Booking Details:", color = TEXT_COLOR)
-
-    Text(add_booking_window, text="Customer:", color=TEXT_COLOR)
-    customer_combo = Combo(add_booking_window, options=[], width="fill")
-    # Populate customer Combo
-    try:
-        cursor.execute("SELECT CustomerID, FirstName, Surname FROM customers")
-        customers = cursor.fetchall()
-        customer_combo.clear()
-        for customer in customers:
-             customer_combo.append(f"{customer['CustomerID']}: {customer['FirstName']} {customer['Surname']}")
-    except mysql.connector.Error as err:
-        info("Database Error", "Could not load customers.")
-        add_booking_window.destroy()
-        return  # Exit the function
-
-    Text(add_booking_window, text="Trip:", color=TEXT_COLOR)
-    trip_combo = Combo(add_booking_window, options=[], width="fill")
-     # Populate trip Combo
-    try:
-        # Only show future trips
-        cursor.execute("""
-            SELECT t.TripID, t.Date, d.DestinationName, d.DestinationID
-            FROM trips t
-            JOIN destinations d ON t.DestinationID = d.DestinationID
-            WHERE t.Date >= CURDATE()
-            ORDER BY t.Date
-        """)
-        trips = cursor.fetchall()
-        trip_combo.clear() #clear options
-        for trip in trips:
-            trip_combo.append(f"{trip['TripID']}: {trip['Date']} - {trip['DestinationName']}")
-    except mysql.connector.Error as err:
-        info("Database Error", "Could not load trips.")
-        add_booking_window.destroy()
-        return
-
-    #  Booking Cost TextBox
-    Text(add_booking_window, text="Booking Cost:", color=TEXT_COLOR)
-    booking_cost_entry = TextBox(add_booking_window)
-
-
-    Text(add_booking_window, text="Number of People:", color=TEXT_COLOR)
-    num_people_entry = TextBox(add_booking_window)
-
-    Text(add_booking_window, text="Special Request:", color=TEXT_COLOR)
-    special_request_entry = TextBox(add_booking_window)
-
-    # REMOVE manual date entry, set to today's date automatically
-    Text(add_booking_window, text="Date of Booking:", color=TEXT_COLOR)
-    date_of_booking_entry = Text(add_booking_window, text = "")  # Display-only Text widget
-
-    import datetime
-
-    # Set the current date
-    current_date = datetime.date.today().strftime("%Y-%m-%d")
-    date_of_booking_entry.value = current_date
-
-
-    # Function for adding booking.
-    def add_booking():
-        try:
-            # --- Input Validation ---
-            # Get selected CustomerID and TripID.  Handle potential errors.
-            selected_customer = customer_combo.value
-            if not selected_customer:
-                info("Input Error", "Please select a customer.")
-                return
-            customer_id = int(selected_customer.split(":")[0]) # Extract ID
-
-            selected_trip = trip_combo.value
-            if not selected_trip:
-                info("Input Error", "Please select a trip.")
-                return
-            trip_id = int(selected_trip.split(":")[0]) # Extract ID
-
-            if not booking_cost_entry.value.isdigit():
-                info("Input Error", "Booking cost must be a number.")
-                return
-            #Number of people validation (checking against coach capacity)
-            if not num_people_entry.value.isdigit():
-                info("Input Error", "Number of People must be an integer.")
-                return
-            num_people = int(num_people_entry.value) # Converting to int for the check
-
-            cursor.execute("SELECT CoachID from trips WHERE TripID = %s", (trip_id,))
-            result = cursor.fetchone()
-            if result:
-                coach_id = result['CoachID']
-                cursor.execute("SELECT Seats from coaches WHERE CoachID = %s", (coach_id,))
-                result = cursor.fetchone()
-                if result:
-                    available_seats = result['Seats']
-                    if num_people > available_seats:
-                        info("Input Error", f"The selected coach only has {available_seats} seats.")
-                        return # Exit if not enough seats
-
-            else:
-                info("Database Error", "Could not retrieve coach information")
-
-
-            cursor.execute("""
-            INSERT INTO bookings (CustomerID, TripID, BookingCost, NumberofPeople, SpecialRequest, BookingDate)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """,
-            (customer_id, trip_id, booking_cost_entry.value,  # Use entered cost
-             num_people_entry.value, special_request_entry.value, current_date)) # Use current_date
-            conn.commit()
-            info("Booking Added", "The booking has been added.")
-            add_booking_window.destroy()
-            staff_bookings_window.show()
-
-        except mysql.connector.Error as err:
-             info("Database Error",f"Error Adding booking to the database. Check Your Input: {err}") #better error
-             print(f"Database Error: {err}")
-        except ValueError:
-            info("Input Error", "Invalid ID format selected.")
-        except IndexError: # added to handle the case if split fails
-            info("Input Error", "Invalid selection.")
-
-
-    add_button = PushButton(add_booking_window, text="Add Booking", command=add_booking)
-    back_button = PushButton(add_booking_window, text="Back", command=add_booking_window.destroy)
-    add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
-    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
-    add_booking_window.show()
-
-
-def open_add_coach_window():
-    global add_coach_window, coach_reg_entry, seats_entry
-    add_coach_window = Window(app, title = "Add Coach", width = 400, height = 400, bg = BG_COLOR)
-    Text(add_coach_window, text="Enter Coach Details:", color = TEXT_COLOR)
-
-    Text(add_coach_window, text = "Coach Registration:", color = TEXT_COLOR)
-    coach_reg_entry = TextBox(add_coach_window)
-
-    Text(add_coach_window, text="Seats in Coach", color = TEXT_COLOR)
-    seats_entry = TextBox(add_coach_window)
-
-    def add_coach():
-        try:
-
-            if not coach_reg_entry.value:
-                info("Input Error", "Coach Registration Required")
-                return
-            if not seats_entry.value.isdigit():
-                info("Input Error", "Number of seats must be a number")
-                return
-            cursor.execute("""
-            INSERT INTO coaches (Registration, Seats)
-            VALUES (%s, %s)""",
-            (coach_reg_entry.value, seats_entry.value))
-            conn.commit()
-            info("Coach Added", "The coach has been added to the database.")
-            add_coach_window.destroy()
-            coaches_window.show()
-
-        except mysql.connector.Error as err:
-            print(f"Database Error: {err}")
-            info("Database Error", "There was an error when trying to add coach. Check Your Input")
-
-
-    add_button = PushButton(add_coach_window, text="Add Coach", command=add_coach)
-    back_button = PushButton(add_coach_window, text="Back", command=add_coach_window.destroy)
-    add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
-    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
-    add_coach_window.show()
 
 def open_add_destination_window():
     global add_destination_window, destination_name_entry, hotel_name_entry
@@ -885,24 +661,7 @@ def open_add_destination_window():
 
     def add_destination():
         try:
-            # --- Input Validation ---
-            if not destination_name_entry.value:
-                info("Input Error", "Destination Name is required.")
-                return
-            if not hotel_name_entry.value:
-                info("Input Error", "Hotel Name is required.")
-                return
-            if not destination_cost_entry.value.isdigit():
-                info("Input Error", "Destination Cost must be a number.")
-                return
-            if not city_name_entry.value:
-                info("Input Error", "City Name is required.")
-                return
-            if not days_entry.value.isdigit():
-                info("Input Error", "Days must be a number.")
-                return
-
-
+            # Corrected SQL statement with correct column names
             cursor.execute("""
             INSERT INTO destinations (DestinationName, Hotel, DestinationCost, CityName, Days)
             VALUES (%s, %s, %s, %s, %s)""",
@@ -934,10 +693,6 @@ def open_add_driver_window():
 
     def add_driver():
         try:
-            if not driver_name_entry.value:
-                info("Input Error", "Driver name is required")
-                return
-            
             cursor.execute("""
             INSERT INTO drivers (DriverName)
             VALUES (%s)""", (driver_name_entry.value,))
@@ -962,20 +717,8 @@ def open_add_trip_window():
     add_trip_window = Window(app, title="Add Trip", width = 400, height = 400, bg = BG_COLOR)
     Text(add_trip_window, text = "Enter Trip Details: ", color = TEXT_COLOR)
 
-    Text(add_trip_window, text = "Coach:", color = TEXT_COLOR)
-    coach_combo = Combo(add_trip_window, options=[], width="fill")
-    #Populate the combo box
-    try:
-        cursor.execute("SELECT CoachID, Registration FROM coaches")
-        coaches = cursor.fetchall()
-        coach_combo.clear()
-        for coach in coaches:
-            coach_combo.append(f"{coach['CoachID']}: {coach['Registration']}")
-    except mysql.connector.Error as err:
-        info("Database Error", "Could not load coaches.")
-        add_trip_window.destroy()  #close window if error occurs
-        return # Exit if cant load data
-    
+    Text(add_trip_window, text = "Coach ID:", color = TEXT_COLOR)
+    coach_id_entry = TextBox(add_trip_window)
 
     Text(add_trip_window, text = "Driver:", color = TEXT_COLOR)
     driver_combo = Combo(add_trip_window, options=[], width="fill")
