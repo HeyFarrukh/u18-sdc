@@ -97,7 +97,7 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
     try:
         search_value = None
         if search_term and search_field:
-            search_value = f"%{search_term}%"
+            search_value = f"%{search_term}%" # Prepare LIKE value unless specific handling needed
 
         # Define Queries, Columns, and Search Mapping
         if table_name == "bookings":
@@ -114,20 +114,31 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
                 LEFT JOIN destinations d ON t.DestinationID = d.DestinationID
             """
             columns = ["ID", "Cust. ID", "Customer Name", "Trip ID", "Destination", "Trip Date", "# People", "Cost", "Request", "Booking Date"]
-            field_map = {
+            field_map = { # Map search field name to DB field/alias
                 "BookingID": "b.BookingID", "CustomerID": "b.CustomerID", "TripID": "b.TripID",
                 "BookingCost": "b.BookingCost", "NumberOfPeople": "b.NumberofPeople",
                 "SpecialRequest": "b.SpecialRequest", "BookingDate": "b.BookingDate",
-                "CustomerName": "CONCAT(c.FirstName, ' ', c.Surname)", "DestinationName": "d.DestinationName"
+                "CustomerName": "CONCAT(c.FirstName, ' ', c.Surname)",
+                "DestinationName": "d.DestinationName"
+                # Add TripDate if needed: "TripDate": "t.Date"
             }
             if search_value and search_field in field_map:
-                where_clause = f" WHERE {field_map[search_field]} LIKE %s"
-                query_params.append(search_value)
+                # Handle exact match for IDs/Cost if desired
+                if search_field in ["BookingID", "CustomerID", "TripID", "NumberOfPeople", "BookingCost"]:
+                    exact_search_value = search_term.lstrip('£') # Remove currency symbol if present
+                    if exact_search_value.isdigit():
+                         where_clause = f" WHERE {field_map[search_field]} = %s"
+                         query_params.append(exact_search_value)
+                         search_value = None # Prevent LIKE search
+                    else: search_term = None # Invalid number for exact search
+                else: # Use LIKE for text fields
+                    where_clause = f" WHERE {field_map[search_field]} LIKE %s"
+                    query_params.append(search_value)
 
         elif table_name == "trips":
+            # Correct SELECT with aliases for user-friendly display
             select_query = """
-                SELECT t.TripID, t.CoachID, c.Registration as CoachReg, t.DriverID, dr.DriverName,
-                       t.DestinationID, d.DestinationName, t.Date
+                SELECT t.TripID, d.DestinationName, dr.DriverName, c.Registration as CoachReg, t.Date
             """
             base_query = """
                 FROM trips t
@@ -135,15 +146,31 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
                 LEFT JOIN drivers dr ON t.DriverID = dr.DriverID
                 LEFT JOIN destinations d ON t.DestinationID = d.DestinationID
             """
-            columns = ["ID", "Coach ID", "Coach Reg", "Driver ID", "Driver Name", "Dest. ID", "Destination", "Date"]
-            field_map = {
-                "TripID": "t.TripID", "CoachID": "t.CoachID", "DriverID": "t.DriverID",
-                "DestinationID": "t.DestinationID", "Date": "t.Date", "CoachReg": "c.Registration",
-                "DriverName": "dr.DriverName", "DestinationName": "d.DestinationName"
+             # Correct columns list reflecting the SELECT order and desired display names
+            columns = ["ID", "Destination", "Driver Name", "Coach Reg", "Date"]
+            field_map = { # Map search field name to DB field/alias
+                "TripID": "t.TripID",
+                "DestinationName": "d.DestinationName",
+                "DriverName": "dr.DriverName",
+                "CoachReg": "c.Registration",
+                "Date": "t.Date",
+                # Add FK IDs if you want to allow searching by them directly
+                "CoachID": "t.CoachID",
+                "DriverID": "t.DriverID",
+                "DestinationID": "t.DestinationID"
             }
             if search_value and search_field in field_map:
-                where_clause = f" WHERE {field_map[search_field]} LIKE %s"
-                query_params.append(search_value)
+                 # Handle exact match for IDs if desired
+                if search_field in ["TripID", "CoachID", "DriverID", "DestinationID"]:
+                    if search_term.isdigit():
+                         where_clause = f" WHERE {field_map[search_field]} = %s"
+                         query_params.append(search_term)
+                         search_value = None # Prevent LIKE search
+                    else: search_term = None # Invalid number for exact search
+                else: # Use LIKE for text fields
+                    where_clause = f" WHERE {field_map[search_field]} LIKE %s"
+                    query_params.append(search_value)
+
 
         elif table_name == "customers":
              select_query = "SELECT CustomerID, FirstName, Surname, Email, AddressLine1, AddressLine2, City, Postcode, PhoneNumber, SpecialNotes"
@@ -151,8 +178,15 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
              columns = ["ID", "First Name", "Surname", "Email", "Address 1", "Address 2", "City", "Postcode", "Phone", "Notes"]
              valid_columns = ["CustomerID", "FirstName", "Surname", "Email", "AddressLine1", "AddressLine2", "City", "Postcode", "PhoneNumber", "SpecialNotes"]
              if search_value and search_field in valid_columns:
-                 where_clause = f" WHERE {search_field} LIKE %s"
-                 query_params.append(search_value)
+                if search_field == "CustomerID": # Exact match for ID
+                     if search_term.isdigit():
+                          where_clause = f" WHERE {search_field} = %s"
+                          query_params.append(search_term)
+                          search_value = None
+                     else: search_term = None
+                else:
+                     where_clause = f" WHERE {search_field} LIKE %s"
+                     query_params.append(search_value)
 
         elif table_name == "coaches":
              select_query = "SELECT CoachID, Registration, Seats"
@@ -160,8 +194,15 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
              columns = ["ID", "Registration", "Seats"]
              valid_columns = ["CoachID", "Registration", "Seats"]
              if search_value and search_field in valid_columns:
-                 where_clause = f" WHERE {search_field} LIKE %s"
-                 query_params.append(search_value)
+                 if search_field in ["CoachID", "Seats"]: # Exact match
+                      if search_term.isdigit():
+                           where_clause = f" WHERE {search_field} = %s"
+                           query_params.append(search_term)
+                           search_value = None
+                      else: search_term = None
+                 else:
+                      where_clause = f" WHERE {search_field} LIKE %s"
+                      query_params.append(search_value)
 
         elif table_name == "destinations":
             select_query = "SELECT DestinationID, DestinationName, Hotel, DestinationCost, CityName, Days"
@@ -169,8 +210,23 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
             columns = ["ID", "Name", "Hotel", "Cost", "City", "Days"]
             valid_columns = ["DestinationID", "DestinationName", "Hotel", "DestinationCost", "CityName", "Days"]
             if search_value and search_field in valid_columns:
-                 where_clause = f" WHERE {search_field} LIKE %s"
-                 query_params.append(search_value)
+                if search_field in ["DestinationID", "DestinationCost", "Days"]: # Exact match
+                    exact_search_value = search_term.lstrip('£')
+                    # Allow float for cost, int for ID/Days
+                    is_valid_num = False
+                    try:
+                        if search_field == "DestinationCost": float(exact_search_value); is_valid_num = True
+                        else: int(exact_search_value); is_valid_num = True
+                    except ValueError: pass
+
+                    if is_valid_num:
+                           where_clause = f" WHERE {search_field} = %s"
+                           query_params.append(exact_search_value)
+                           search_value = None
+                    else: search_term = None
+                else: # LIKE for text
+                     where_clause = f" WHERE {search_field} LIKE %s"
+                     query_params.append(search_value)
 
         elif table_name == "drivers":
              select_query = "SELECT DriverID, DriverName"
@@ -178,20 +234,29 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
              columns = ["ID", "Driver Name"]
              valid_columns = ["DriverID", "DriverName"]
              if search_value and search_field in valid_columns:
-                 where_clause = f" WHERE {search_field} LIKE %s"
-                 query_params.append(search_value)
+                 if search_field == "DriverID": # Exact match
+                      if search_term.isdigit():
+                           where_clause = f" WHERE {search_field} = %s"
+                           query_params.append(search_term)
+                           search_value = None
+                      else: search_term = None
+                 else:
+                     where_clause = f" WHERE {search_field} LIKE %s"
+                     query_params.append(search_value)
         else:
             Text(table_box, text=f"Table '{table_name}' display not configured.", color="red")
             return
 
-        # Map display columns back to data keys
+        # Map display columns back to data keys for fetching row data (handles aliases)
         data_key_map = {}
         if table_name == "bookings": data_key_map = {"ID": "BookingID", "Cust. ID": "CustomerID", "Customer Name": "CustomerName", "Trip ID": "TripID", "Destination": "DestinationName", "Trip Date": "TripDate", "# People": "NumberofPeople", "Cost": "Cost", "Request": "SpecialRequest", "Booking Date": "BookingDate"}
-        elif table_name == "trips": data_key_map = {"ID": "TripID", "Coach ID": "CoachID", "Coach Reg": "CoachReg", "Driver ID": "DriverID", "Driver Name": "DriverName", "Dest. ID": "DestinationID", "Destination": "DestinationName", "Date": "Date"}
+        # Corrected data_key_map for trips to match the corrected SELECT and columns
+        elif table_name == "trips": data_key_map = {"ID": "TripID", "Destination": "DestinationName", "Driver Name": "DriverName", "Coach Reg": "CoachReg", "Date": "Date"}
         elif table_name == "customers": data_key_map = {"ID": "CustomerID", "First Name": "FirstName", "Surname": "Surname", "Email": "Email", "Address 1": "AddressLine1", "Address 2": "AddressLine2", "City": "City", "Postcode": "Postcode", "Phone": "PhoneNumber", "Notes": "SpecialNotes"}
         elif table_name == "coaches": data_key_map = {"ID": "CoachID", "Registration": "Registration", "Seats": "Seats"}
         elif table_name == "destinations": data_key_map = {"ID": "DestinationID", "Name": "DestinationName", "Hotel": "Hotel", "Cost": "DestinationCost", "City": "CityName", "Days": "Days"}
         elif table_name == "drivers": data_key_map = {"ID": "DriverID", "Driver Name": "DriverName"}
+
 
         # --- Execute Queries ---
         count_query = f"SELECT COUNT(*) as total {base_query}{where_clause}"
@@ -215,7 +280,12 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
             for row, record_dict in enumerate(records, start=1):
                 for col, header in enumerate(columns):
                     data_key = data_key_map.get(header, header)
-                    data_to_display = str(record_dict.get(data_key, ''))
+                    # Format Date objects nicely
+                    raw_value = record_dict.get(data_key, '')
+                    if isinstance(raw_value, datetime.date):
+                        data_to_display = raw_value.strftime('%Y-%m-%d')
+                    else:
+                        data_to_display = str(raw_value)
                     Text(table_grid, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10)
         elif not columns: Text(table_box, text="Columns not defined.", color="red")
         else: Text(table_box, text="No records found.", color=TEXT_COLOR)
@@ -346,7 +416,7 @@ def get_all_trips():
 
 
 # --- Functions to open data windows (Passing back function directly) ---
-# (Keep the open_*_data_window functions as they were in the previous response)
+# (Keep the open_*_data_window functions as they were)
 def open_bookings_data_window(parent_window, back_function_to_call):
     """Opens a new window to display booking data using the integrated table view."""
     parent_window.hide()
@@ -674,8 +744,7 @@ def open_staff_trips_window():
     view_trips_button = PushButton(button_box, text="View Trips", width=20,
                                    command=lambda: open_trips_data_window(staff_trips_window, go_back_to_staff_trips_menu_from_data))
     add_trips_button = PushButton(button_box, text="Add Trips", width=20, command=open_add_trip_window)
-    # <<<--- Link Remove Trips button --->>>
-    remove_trips_button = PushButton(button_box, text="Remove Trips", width = 20, command=open_remove_trip_window)
+    remove_trips_button = PushButton(button_box, text="Remove Trips", width = 20, command=open_remove_trip_window) # Linked function
 
     back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_trips)
     view_trips_button.bg = BUTTON_BG_COLOR; view_trips_button.text_color = BUTTON_TEXT_COLOR
@@ -800,6 +869,7 @@ def open_add_booking_window():
     Text(add_booking_window, text="Trip:", color=TEXT_COLOR)
     trip_combo = Combo(add_booking_window, options=[], width="fill")
     try:
+        # <<<--- Corrected: Only shows future trips --->>>
         cursor.execute("""
             SELECT t.TripID, t.Date, d.DestinationName
             FROM trips t JOIN destinations d ON t.DestinationID = d.DestinationID
@@ -810,6 +880,10 @@ def open_add_booking_window():
         trip_combo.append("")
         for trip in trips:
             trip_combo.append(f"{trip['TripID']}: {trip['Date']} - {trip['DestinationName']}")
+        if not trips: # Disable if no future trips
+             trip_combo.append("No upcoming trips available")
+             trip_combo.disable()
+
     except mysql.connector.Error as err:
         info("Database Error", f"Could not load trips: {err}")
         add_booking_window.destroy(); parent.show(); return
@@ -829,8 +903,8 @@ def open_add_booking_window():
             # Input Validation
             selected_customer = customer_combo.value
             selected_trip = trip_combo.value
-            if not selected_customer or not selected_trip:
-                info("Input Error", "Please select both a customer and a trip.")
+            if not selected_customer or not selected_trip or ":" not in selected_trip: # Check for valid trip selection
+                info("Input Error", "Please select both a customer and a valid upcoming trip.")
                 return
             customer_id = int(selected_customer.split(":")[0])
             trip_id = int(selected_trip.split(":")[0])
@@ -1043,8 +1117,10 @@ def open_add_trip_window():
             if not re.match(date_pattern, trip_date_str): info("Input Error", "Invalid date format. Use YYYY-MM-DD."); return
             try:
                 trip_date = datetime.datetime.strptime(trip_date_str, "%Y-%m-%d").date()
+                # <<<--- Date Validation: Prevent adding trips in the past --->>>
                 if trip_date < datetime.date.today():
-                    if not app.yesno("Past Date", "Selected date is in the past. Continue?"): return
+                     info("Input Error", "Cannot add a trip with a date in the past.")
+                     return
             except ValueError: info("Input Error", "Invalid date value."); return
 
             cursor.execute("INSERT INTO trips (CoachID, DriverID, DestinationID, Date) VALUES (%s, %s, %s, %s)",
@@ -1067,8 +1143,8 @@ def open_add_trip_window():
     add_trip_window.show()
 #endregion
 
-#region Remove Windows (MODIFIED TO USE COMBO)
-
+#region Remove Windows (Using Combo)
+# (Keep the open_remove_* functions as they were)
 def open_remove_booking_window():
     parent = staff_bookings_window # Assume called from staff
 
