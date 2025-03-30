@@ -1,0 +1,5 @@
+Made sure no more foreign keys are shown in any of the viewing tables like Viewing Trips
+No More ID's need to be input for removing any data, instead drop down can be utilised. 
+Passengers can no longer Book On trips in the past
+Data is presented in tabular form
+Shows Remaining Seats

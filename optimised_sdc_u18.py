@@ -894,11 +894,15 @@ def open_add_booking_window(parent_window):
     num_people_entry_widget = None
     special_request_entry_widget = None
     booking_date_entry_widget = None
+    available_seats_text_widget = None # <-- ADDED: Widget to display available seats
     add_button = None
     back_button = None
 
+    # Store current available seats for validation
+    current_available_seats = 0
+
     try:
-        add_booking_win = Window(app, title="Add Booking", width=450, height=480, bg=BG_COLOR) # Use app as master
+        add_booking_win = Window(app, title="Add Booking", width=450, height=520, bg=BG_COLOR) # Increased height slightly
         add_booking_win.tk.resizable(False, False) # Prevent resizing
 
         # Use a Box with grid layout for the main form elements
@@ -915,37 +919,74 @@ def open_add_booking_window(parent_window):
         Text(form_box, text="Trip:", color=TEXT_COLOR, grid=[0, 2], align="left")
         trip_combo_widget = Combo(form_box, options=[""], width=25, grid=[1, 2], align="left") # Use grid position
 
-        # Row 3: Number of People Label and Entry
-        Text(form_box, text="Number of People:", color=TEXT_COLOR, grid=[0, 3], align="left")
-        num_people_entry_widget = TextBox(form_box, width=10, grid=[1, 3], align="left") # Use grid position, adjust width
+        # Row 3: Available Seats Display <-- ADDED
+        available_seats_text_widget = Text(form_box, text="Seats Available: -", color=TEXT_COLOR, grid=[0, 3, 2, 1], align="left")
 
-        # Row 4: Special Request Label and Entry
-        Text(form_box, text="Special Request:", color=TEXT_COLOR, grid=[0, 4], align="left")
-        special_request_entry_widget = TextBox(form_box, width=25, grid=[1, 4], align="left", multiline=True, height=3) # Use grid position
+        # Row 4: Number of People Label and Entry
+        Text(form_box, text="Number of People:", color=TEXT_COLOR, grid=[0, 4], align="left")
+        num_people_entry_widget = TextBox(form_box, width=10, grid=[1, 4], align="left")
 
-        # Row 5: Booking Date Label and Entry
-        Text(form_box, text="Booking Date:", color=TEXT_COLOR, grid=[0, 5], align="left")
-        booking_date_entry_widget = TextBox(form_box, width=15, grid=[1, 5], align="left", enabled=False) # Use grid position, initially disabled
+        # Row 5: Special Request Label and Entry
+        Text(form_box, text="Special Request:", color=TEXT_COLOR, grid=[0, 5], align="left")
+        special_request_entry_widget = TextBox(form_box, width=25, grid=[1, 5], align="left", multiline=True, height=3)
 
-        # Function to update booking date when trip changes
-        def update_booking_date():
+        # Row 6: Booking Date Label and Entry
+        Text(form_box, text="Booking Date:", color=TEXT_COLOR, grid=[0, 6], align="left")
+        booking_date_entry_widget = TextBox(form_box, width=15, grid=[1, 6], align="left", enabled=False)
+
+        # Function to update booking date AND available seats when trip changes
+        def update_trip_details():
+            nonlocal current_available_seats # Allow modification of the outer scope variable
             selected_trip_str = trip_combo_widget.value
             trip_date = None
-            # Try to extract date using regex
-            match = re.match(r"^\d+: (\d{4}-\d{2}-\d{2}) - .+$", selected_trip_str)
-            if match:
-                trip_date = match.group(1)
+            trip_id = None
+            current_available_seats = 0 # Reset
+
+            # Try to extract ID and date
+            match_id = re.match(r"^(\d+):.*", selected_trip_str)
+            match_date = re.match(r"^\d+: (\d{4}-\d{2}-\d{2}) - .+$", selected_trip_str)
+
+            if match_id:
+                trip_id = int(match_id.group(1))
+            if match_date:
+                trip_date = match_date.group(1)
 
             if trip_date:
                 booking_date_entry_widget.value = trip_date
-                booking_date_entry_widget.enabled = False # Keep it disabled
+                booking_date_entry_widget.enabled = False
             else:
-                # If no valid trip selected (e.g., blank option), clear and disable
                 booking_date_entry_widget.value = ""
                 booking_date_entry_widget.enabled = False
 
+            # Fetch and display available seats if a valid trip ID is found
+            if trip_id:
+                try:
+                    # Get Total Seats
+                    cursor.execute("SELECT c.Seats FROM trips t JOIN coaches c ON t.CoachID = c.CoachID WHERE t.TripID = %s", (trip_id,))
+                    seat_result = cursor.fetchone()
+                    total_seats = seat_result['Seats'] if seat_result else 0
+
+                    # Get Booked Seats
+                    cursor.execute("SELECT SUM(NumberofPeople) as booked FROM bookings WHERE TripID = %s", (trip_id,))
+                    booked_result = cursor.fetchone()
+                    booked_seats = booked_result['booked'] or 0
+
+                    current_available_seats = total_seats - booked_seats
+                    available_seats_text_widget.value = f"Seats Available: {current_available_seats}"
+
+                except mysql.connector.Error as err:
+                    available_seats_text_widget.value = "Error checking seats"
+                    print(f"DB Error checking seats: {err}")
+                except Exception as e:
+                    available_seats_text_widget.value = "Error checking seats"
+                    print(f"Error checking seats: {e}")
+            else:
+                # If no valid trip selected (e.g., blank option), clear info
+                available_seats_text_widget.value = "Seats Available: -"
+                current_available_seats = 0
+
         # Assign the update function to the trip combo command
-        trip_combo_widget.update_command(update_booking_date)
+        trip_combo_widget.update_command(update_trip_details)
 
         # Populate Customer Combo (ORDER BY CustomerID ASC)
         try:
@@ -954,7 +995,6 @@ def open_add_booking_window(parent_window):
             customer_combo_widget.append("")
             if customers_data:
                 for customer in customers_data:
-                     # Display format remains the same
                      customer_combo_widget.append(f"{customer['CustomerID']}: {customer['FirstName']} {customer['Surname']}")
             else:
                 customer_combo_widget.append("No customers found")
@@ -987,6 +1027,8 @@ def open_add_booking_window(parent_window):
 
         # Inner function to handle adding the booking
         def add_booking():
+            # Use the 'current_available_seats' calculated when trip was selected
+            nonlocal current_available_seats
             calculated_cost = 0
             selected_customer = customer_combo_widget.value
             selected_trip = trip_combo_widget.value
@@ -1004,19 +1046,23 @@ def open_add_booking_window(parent_window):
                      return
 
                 customer_id = int(selected_customer.split(":")[0])
-                trip_id = int(selected_trip.split(":")[0])
+                trip_id = int(selected_trip.split(":")[0]) # Already validated if we have available seats info
 
                 if not num_people_str.isdigit() or int(num_people_str) <= 0:
                     info("Input Error", "Number of People must be a positive integer.")
                     return
                 num_people = int(num_people_str)
 
+                # --- Check Capacity AGAIN (as a final confirmation) ---
+                # Use the value calculated when the trip was selected
+                if num_people > current_available_seats:
+                    info("Input Error", f"Not enough seats available ({current_available_seats} left). Cannot book {num_people}.")
+                    return
+
                 # Validate the automatically populated date field is not empty
                 if not booking_date_str:
                      info("Input Error", "Booking Date could not be determined from Trip. Please re-select Trip.")
                      return
-                # No need to parse or check if date is in the past, it's derived from a future trip
-                # Check format just in case something went wrong
                 try:
                     datetime.datetime.strptime(booking_date_str, "%Y-%m-%d").date()
                 except ValueError:
@@ -1030,19 +1076,6 @@ def open_add_booking_window(parent_window):
                 if cost_result and cost_result['DestinationCost'] is not None:
                      calculated_cost = float(cost_result['DestinationCost']) * num_people
                 else: info("Error", "Could not retrieve destination cost."); return
-
-                # --- Check Capacity ---
-                cursor.execute("SELECT c.Seats FROM trips t JOIN coaches c ON t.CoachID = c.CoachID WHERE t.TripID = %s", (trip_id,))
-                seat_result = cursor.fetchone()
-                if seat_result:
-                    available_seats = seat_result['Seats']
-                    cursor.execute("SELECT SUM(NumberofPeople) as booked FROM bookings WHERE TripID = %s", (trip_id,))
-                    booked_result = cursor.fetchone()
-                    booked_seats = booked_result['booked'] or 0
-                    if num_people > (available_seats - booked_seats):
-                        info("Input Error", f"Not enough seats available ({available_seats - booked_seats} left).")
-                        return
-                else: info("Database Error", "Could not retrieve coach capacity."); return
 
                 # --- Insert Booking ---
                 cursor.execute("""
@@ -1070,8 +1103,8 @@ def open_add_booking_window(parent_window):
         add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
         back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
 
-        # Call update_booking_date initially in case a default value is somehow selected
-        update_booking_date()
+        # Call update_trip_details initially to set date and seats if a default trip is selected
+        update_trip_details()
         add_booking_win.show()
 
     except Exception as e: # Catch errors during window creation itself
