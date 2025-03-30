@@ -3,7 +3,7 @@ import mysql.connector
 from mysql.connector import errorcode
 
 
-# --- Database Configuration ---
+# --- Database Configuration---
 DB_HOST = "localhost"
 DB_USER = "root"
 DB_PASSWORD = "root"
@@ -181,7 +181,6 @@ def open_customers_data_window():
     customers_data = get_all_customers()
     if customers_data:
         for customer in customers_data:
-            # Corrected attribute names here
             customers_list.append(f"Customer ID: {customer['CustomerID']}, Name: {customer['FirstName']} {customer['Surname']}, Email: {customer['Email']}, Address: {customer['AddressLine1']} {customer['AddressLine2']} {customer['City']} {customer['Postcode']}, Phone: {customer['PhoneNumber']}, Notes: {customer['SpecialNotes']}")
     else:
         customers_list.append("Could not retrieve customer data.")
@@ -201,7 +200,6 @@ def open_coaches_data_window():
     coaches_data = get_all_coaches()
     if coaches_data:
         for coach in coaches_data:
-            # Corrected attribute names here
             coaches_list.append(f"Coach ID: {coach['CoachID']}, Registration: {coach['Registration']}, Seats: {coach['Seats']}")
     else:
         coaches_list.append("Could not retrieve coach data.")
@@ -222,7 +220,6 @@ def open_destinations_data_window():
     destinations_data = get_all_destinations()
     if destinations_data:
         for destination in destinations_data:
-             # Corrected attribute names here
             destinations_list.append(f"Destination ID: {destination['DestinationID']}, Name: {destination['DestinationName']}, Hotel: {destination['Hotel']}, Cost: {destination['DestinationCost']}, City: {destination['CityName']}, Days: {destination['Days']}")
     else:
         destinations_list.append("Could not retrieve destination data.")
@@ -295,7 +292,7 @@ def open_destinations_window():
     add_destinations_button = PushButton(button_box, text="Add Destinations", width=20, command=open_add_destination_window)
 
     remove_destinations_button = PushButton(button_box, text="Remove Destinations", width=20, command=open_remove_destination_window)
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_admin_main_from_destinations) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_admin_main_from_destinations)
     view_destinations_button.bg = BUTTON_BG_COLOR
     add_destinations_button.bg = BUTTON_BG_COLOR
     remove_destinations_button.bg = BUTTON_BG_COLOR
@@ -328,7 +325,7 @@ def open_drivers_window():
     view_drivers_button = PushButton(button_box, text="View Drivers", width=20, command=open_drivers_data_window)
     add_drivers_button = PushButton(button_box, text="Add Drivers", width=20, command=open_add_driver_window)
     remove_drivers_button = PushButton(button_box, text="Remove Drivers", width=20, command=open_remove_driver_window)
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_admin_main_from_drivers) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_admin_main_from_drivers)
     view_drivers_button.bg = BUTTON_BG_COLOR; view_drivers_button.text_color = BUTTON_TEXT_COLOR
     add_drivers_button.bg = BUTTON_BG_COLOR; add_drivers_button.text_color = BUTTON_TEXT_COLOR
     remove_drivers_button.bg = BUTTON_BG_COLOR; remove_drivers_button.text_color = BUTTON_TEXT_COLOR
@@ -346,7 +343,7 @@ def open_admin_main_window():
     destinations_button = PushButton(button_box, text="DESTINATIONS", width=15, command=open_destinations_window)
     coaches_button = PushButton(button_box, text="COACHES", width=15, command=open_coaches_window)
     drivers_button = PushButton(button_box, text="DRIVERS", width=15, command=open_drivers_window)
-    search_button = PushButton(button_box, text="SEARCH", width=15, command=open_query_window) # Added Search button
+    search_button = PushButton(button_box, text="SEARCH", width=15, command=open_query_window)
     customers_button.bg = BUTTON_BG_COLOR; customers_button.text_color = BUTTON_TEXT_COLOR
     destinations_button.bg = BUTTON_BG_COLOR; destinations_button.text_color = BUTTON_TEXT_COLOR
     coaches_button.bg = BUTTON_BG_COLOR; coaches_button.text_color = BUTTON_TEXT_COLOR
@@ -364,7 +361,7 @@ def open_staff_customers_window():
     button_box = Box(staff_customers_window, layout="auto", width="fill")
     add_customer_button = PushButton(button_box, text="Add Customer", width=20, command=open_add_customer_window)
     remove_customer_button = PushButton(button_box, text="Remove Customer", width=20, command=open_remove_customer_window)
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_customers) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_customers) 
     add_customer_button.bg = BUTTON_BG_COLOR; add_customer_button.text_color = BUTTON_TEXT_COLOR
     remove_customer_button.bg = BUTTON_BG_COLOR; remove_customer_button.text_color = BUTTON_TEXT_COLOR
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
@@ -412,7 +409,7 @@ def open_staff_trips_window():
     add_trips_button = PushButton(button_box, text="Add Trips", width=20, command=open_add_trip_window)
     remove_trips_button = PushButton(button_box, text="Remove Trips", width = 20)
 
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_trips) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_trips) 
     view_trips_button.bg = BUTTON_BG_COLOR; view_trips_button.text_color = BUTTON_TEXT_COLOR
 
     add_trips_button.bg = BUTTON_BG_COLOR; add_trips_button.text_color = BUTTON_TEXT_COLOR
@@ -505,7 +502,6 @@ def open_add_coach_window():
 
     def add_coach():
         try:
-            # Corrected SQL query
             cursor.execute("""
             INSERT INTO coaches (Registration, Seats)
             VALUES (%s, %s)""",
@@ -556,7 +552,6 @@ def open_add_customer_window():
 
     def add_customer():
         try:
-            # Corrected SQL query with correct column names
             cursor.execute("""
                 INSERT INTO customers (FirstName, Surname, Email, AddressLine1,
                                        AddressLine2, City, Postcode, PhoneNumber, SpecialNotes)
@@ -567,7 +562,7 @@ def open_add_customer_window():
             conn.commit()
             info("Success", "Customer added successfully.")
             add_customer_window.destroy()
-            staff_customers_window.show()  # or admin, depending on context
+            staff_customers_window.show()
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
             info("Database Error", "Failed to add customer. Check Your Input")
@@ -604,7 +599,6 @@ def open_add_destination_window():
 
     def add_destination():
         try:
-            # Corrected SQL statement with correct column names
             cursor.execute("""
             INSERT INTO destinations (DestinationName, Hotel, DestinationCost, CityName, Days)
             VALUES (%s, %s, %s, %s, %s)""",
@@ -712,7 +706,7 @@ def open_remove_booking_window():
             conn.commit()
             info("Success", "Booking removed successfully.")
             remove_booking_window.destroy()
-            staff_bookings_window.show()  # Or admin_bookings_window, depending on context
+            staff_bookings_window.show()
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
             info("Database Error", "Failed to remove Booking.  Check that the Booking ID exists.")
@@ -761,7 +755,7 @@ def open_remove_customer_window():
             conn.commit()
             info("Success", "Customer removed successfully.")
             remove_customer_window.destroy()
-            staff_customers_window.show() #or admin if admin
+            staff_customers_window.show()
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
             info("Database Error", "Failed to remove customer. Check that the Customer ID exists.")
@@ -856,14 +850,13 @@ def open_query_window():
             destinations = cursor.fetchall()
             destination_options = [f"{dest['DestinationID']}: {dest['DestinationName']}" for dest in destinations]
 
-            # CORRECTED: Clear existing options and append new ones.
-            destination_combo.clear()  # Clear any previous options (important!)
+            destination_combo.clear()
             for option in destination_options:
                 destination_combo.append(option)
 
         except mysql.connector.Error as err:
             info("Database Error", f"Error fetching destinations: {err}")
-            selection_window.destroy()  # Close if we can't get destinations
+            selection_window.destroy()
             return
 
         # 3.  The function that actually executes the query (now with parameters).
@@ -881,7 +874,6 @@ def open_query_window():
                 destination_id = int(selected_destination.split(":")[0])
 
 
-                # Corrected SQL query with parameters for destination and date.  SAFE.
                 cursor.execute("""
                     SELECT c.FirstName, c.Surname
                     FROM customers c
@@ -889,7 +881,7 @@ def open_query_window():
                     JOIN trips t ON b.TripID = t.TripID
                     JOIN destinations d ON t.DestinationID = d.DestinationID
                     WHERE d.DestinationID = %s AND t.Date = %s
-                """, (destination_id, trip_date))  # Use parameters!
+                """, (destination_id, trip_date))
                 passengers = cursor.fetchall()
 
                 result_window = Window(query_window, title="Passengers", width=400, height=300, bg=BG_COLOR)
@@ -902,7 +894,7 @@ def open_query_window():
                 close_button = PushButton(result_window, text="Close", command=result_window.destroy)
                 close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
                 result_window.show()
-                selection_window.destroy()  # Close selection window *after* showing results
+                selection_window.destroy() 
 
             except mysql.connector.Error as err:
                 info("Database Error", f"Error fetching passenger data: {err}")
@@ -961,12 +953,12 @@ def open_query_window():
                     info("Input Error", "Please enter a postcode.")
                     return
 
-                # Use parameterized query for safety!
+                # Using parameterised query for safety!
                 cursor.execute("""
                     SELECT FirstName, Surname, AddressLine1, AddressLine2, City, Postcode
                     FROM customers
                     WHERE Postcode LIKE %s
-                """, (postcode + '%',))  # Add % for wildcard matching
+                """, (postcode + '%',))  # Added % for wildcard matching
                 customers = cursor.fetchall()
 
                 result_window = Window(query_window, title=f"Customers in {postcode}", width=600, height=400, bg=BG_COLOR)
@@ -981,7 +973,7 @@ def open_query_window():
                 close_button = PushButton(result_window, text="Close", command=result_window.destroy)
                 close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
                 result_window.show()
-                postcode_window.destroy()  # Close input window
+                postcode_window.destroy()  
 
             except mysql.connector.Error as err:
                 info("Database Error", f"Error fetching customer data: {err}")
@@ -1056,7 +1048,7 @@ def open_admin_login_window():
     Text(admin_login_window, text="Password:", color=TEXT_COLOR)
     password_entry = TextBox(admin_login_window, hide_text=True)
     login_button = PushButton(admin_login_window, text="Login", command=check_admin_login)
-    back_button = PushButton(admin_login_window, text="Back", command=go_back_to_main_menu) # Corrected
+    back_button = PushButton(admin_login_window, text="Back", command=go_back_to_main_menu)
     login_button.bg = BUTTON_BG_COLOR; login_button.text_color = BUTTON_TEXT_COLOR
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     admin_login_window.show()

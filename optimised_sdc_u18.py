@@ -1,6 +1,7 @@
 from guizero import App, Text, PushButton, TextBox, Window, info, Picture, Combo, Box, ListBox
 import mysql.connector
 from mysql.connector import errorcode
+import re
 
 
 # --- Database Configuration ---
@@ -147,85 +148,145 @@ def get_all_trips():
 
 # --- Function to open a new window and display data ---
 def open_bookings_data_window():
-    """Opens a new window to display booking data."""
-    staff_bookings_window.hide() # Hide the previous window
-    global bookings_data_window # Make it global so back button can access it
-    bookings_data_window = Window(app, title="Booking Data", width=800, height=600, bg=BG_COLOR)
+    """Opens a new window to display booking data in a table."""
+    staff_bookings_window.hide()
+    global bookings_data_window
+    bookings_data_window = Window(app, title="Booking Data", width=900, height=600, bg=BG_COLOR)
     Text(bookings_data_window, text="All Bookings", color=TEXT_COLOR, size=14, font="Arial")
-    bookings_list = ListBox(bookings_data_window,  width="fill", height="fill", scrollbar=True) # ListBox in the new window
 
-    back_button_box = Box(bookings_data_window, layout="auto", width="fill") # Box for back button in data window
-    back_button = PushButton(back_button_box, text="Back to Bookings Menu", command=go_back_to_staff_bookings_menu_from_data)
-    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
-
+    bookings_list = ListBox(bookings_data_window, width="fill", height="fill", scrollbar=True)
 
     bookings_data = get_all_bookings()
     if bookings_data:
+        # Create a header string with appropriate spacing
+        header = f"{'Booking ID':<10}{'Customer ID':<12}{'Trip ID':<8}{'Cost':<8}{'People':<8}{'Special Request':<30}{'Booking Date':<12}"  # Adjust spacing as needed
+        bookings_list.append(header) # Add the header as the first item.
+        bookings_list.append("-" * 80) #Separator
+
         for booking in bookings_data:
-            bookings_list.append(f"Booking ID: {booking['BookingID']}, Customer ID: {booking['CustomerID']}, Trip ID: {booking['TripID']}, Cost: {booking['BookingCost']}, People: {booking['NumberofPeople']}, Date: {booking['BookingDate']}")
+            # ONE string per row.
+            row_string = (f"{booking['BookingID']:<10}"
+                          f"{booking['CustomerID']:<12}"
+                          f"{booking['TripID']:<8}"
+                          f"£{booking['BookingCost']:<7}"  # Added £ and spacing
+                          f"{booking['NumberofPeople']:<8}"
+                          f"{booking['SpecialRequest'] or '':<30}"  # Handle None
+                          f"{booking['BookingDate']}") #Removed extra spaces
+
+            bookings_list.append(row_string) # Add the formatted row to the ListBox
     else:
         bookings_list.append("Could not retrieve booking data.")
+
+    back_button_box = Box(bookings_data_window, layout="auto", width="fill")
+    back_button = PushButton(back_button_box, text="Back to Bookings Menu", command=go_back_to_staff_bookings_menu_from_data)
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR;
     bookings_data_window.show()
 
+
 def open_customers_data_window():
-    customers_window.hide()
+    customers_window.hide() 
     global customers_data_window
-    customers_data_window = Window(app, title = "Customer Data", width = 800, height = 600, bg = BG_COLOR)
+    customers_data_window = Window(app, title = "Customer Data", width = 1100, height = 600, bg = BG_COLOR)  # Adjusted width
     Text(customers_data_window, text="All Customers", color = TEXT_COLOR, size = 14, font="Arial")
+
+    # Use a ListBox with built in scrollbar
     customers_list = ListBox(customers_data_window, width="fill", height="fill", scrollbar=True)
+
+    customers_data = get_all_customers()
+    if customers_data:
+        # Header
+        header = (f"{'Customer ID':<12}{'First Name':<15}{'Surname':<15}{'Email':<25}"
+                  f"{'Address Line 1':<25}{'Address Line 2':<25}{'City':<15}{'Postcode':<10}"
+                  f"{'Phone Number':<15}{'Notes':<20}")
+        customers_list.append(header)
+        customers_list.append("-" * 140)
+
+
+        for customer in customers_data:
+            row_string = (f"{customer['CustomerID']:<12}"
+                           f"{customer['FirstName']:<15}"
+                           f"{customer['Surname']:<15}"
+                           f"{customer['Email']:<25}"
+                           f"{customer['AddressLine1']:<25}"
+                           f"{customer['AddressLine2'] or '':<25}"  # Handle None
+                           f"{customer['City']:<15}"
+                           f"{customer['Postcode']:<10}"
+                           f"{customer['PhoneNumber']:<15}"
+                           f"{customer['SpecialNotes'] or '':<20}") # Handle None
+            customers_list.append(row_string)
+
+    else:
+        customers_list.append("Could not retrieve customer data.")
 
     back_button_box = Box(customers_data_window, layout="auto", width="fill")
     back_button = PushButton(back_button_box, text = "Back to Customers Menu", command=go_back_to_admin_customers_menu_from_data)
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
-
-    customers_data = get_all_customers()
-    if customers_data:
-        for customer in customers_data:
-            # Corrected attribute names here
-            customers_list.append(f"Customer ID: {customer['CustomerID']}, Name: {customer['FirstName']} {customer['Surname']}, Email: {customer['Email']}, Address: {customer['AddressLine1']} {customer['AddressLine2']} {customer['City']} {customer['Postcode']}, Phone: {customer['PhoneNumber']}, Notes: {customer['SpecialNotes']}")
-    else:
-        customers_list.append("Could not retrieve customer data.")
     customers_data_window.show()
 
+
 def open_coaches_data_window():
-    coaches_window.hide()
+    coaches_window.hide() 
     global coaches_data_window
     coaches_data_window = Window(app, title = "Coach Data", width = 800, height = 600, bg=BG_COLOR)
     Text(coaches_data_window, text="All Coaches", color=TEXT_COLOR, size = 14, font = "Arial")
+
     coaches_list = ListBox(coaches_data_window, width="fill", height="fill", scrollbar=True)
 
-    back_button_box = Box(coaches_data_window, layout="auto", width="fill")
-    back_button = PushButton(back_button_box, text="Back to Coaches Menu", command=go_back_to_admin_coaches_menu_from_data)
-    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+
+    # --- Header Row ---
+    header = f"{'Coach ID':<8}{'Registration':<15}{'Seats':<6}"
+    coaches_list.append(header)
+    coaches_list.append("-" * 30) #separator
 
     coaches_data = get_all_coaches()
     if coaches_data:
         for coach in coaches_data:
-            # Corrected attribute names here
-            coaches_list.append(f"Coach ID: {coach['CoachID']}, Registration: {coach['Registration']}, Seats: {coach['Seats']}")
+            row_string = (f"{coach['CoachID']:<8}"
+                           f"{coach['Registration']:<15}"
+                           f"{coach['Seats']:<6}")
+            coaches_list.append(row_string)
+
     else:
         coaches_list.append("Could not retrieve coach data.")
+
+
+    back_button_box = Box(coaches_data_window, layout="auto", width="fill")
+    back_button = PushButton(back_button_box, text="Back to Coaches Menu", command=go_back_to_admin_coaches_menu_from_data)
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     coaches_data_window.show()
 
 def open_destinations_data_window():
-    destinations_window.hide()
+    destinations_window.hide() 
     global destinations_data_window
     destinations_data_window = Window(app, title="Destination Data", width = 800, height=600, bg=BG_COLOR)
     Text(destinations_data_window, text="All Destinations", color = TEXT_COLOR, size=14, font="Arial")
+
     destinations_list = ListBox(destinations_data_window, width="fill", height="fill", scrollbar=True)
+
+    # --- Header Row ---
+    header = (f"{'Destination ID':<15}{'Name':<25}{'Hotel':<25}{'Cost':<8}{'City':<15}{'Days':<6}")
+    destinations_list.append(header)
+    destinations_list.append("-" * 90)
+
+    destinations_data = get_all_destinations()
+    if destinations_data:
+
+        for destination in destinations_data:
+            row_string = (f"{destination['DestinationID']:<15}"
+                           f"{destination['DestinationName']:<25}"
+                           f"{destination['Hotel'] or '':<25}"  # Handle None.
+                           f"£{destination['DestinationCost']:<7}"   # Format as currency
+                           f"{destination['CityName']:<15}"
+                           f"{destination['Days']:<6}")
+            destinations_list.append(row_string)
+    else:
+        destinations_list.append("Could not retrieve destination data.")
+
 
     back_button_box = Box(destinations_data_window, layout="auto", width="fill")
     back_button = PushButton(back_button_box, text="Back to Destinations Menu", command=go_back_to_admin_destinations_menu_from_data)
     back_button.bg = BUTTON_BG_COLOR
     back_button.text_color = BUTTON_TEXT_COLOR
-
-    destinations_data = get_all_destinations()
-    if destinations_data:
-        for destination in destinations_data:
-             # Corrected attribute names here
-            destinations_list.append(f"Destination ID: {destination['DestinationID']}, Name: {destination['DestinationName']}, Hotel: {destination['Hotel']}, Cost: {destination['DestinationCost']}, City: {destination['CityName']}, Days: {destination['Days']}")
-    else:
-        destinations_list.append("Could not retrieve destination data.")
     destinations_data_window.show()
 
 def open_drivers_data_window():
@@ -233,40 +294,62 @@ def open_drivers_data_window():
     global drivers_data_window
     drivers_data_window = Window(app, title="Driver Data", width=800, height=600, bg=BG_COLOR)
     Text(drivers_data_window, text="All Drivers", color = TEXT_COLOR, size=14, font="Arial")
+
+    # Use ListBox with scrollbar
     drivers_list = ListBox(drivers_data_window, width = "fill", height = "fill", scrollbar=True)
+
+    # --- Header row ---
+    header = f"{'Driver ID':<10}{'Driver Name':<20}"
+    drivers_list.append(header)
+    drivers_list.append("-" * 30)
+
+    drivers_data = get_all_drivers()
+    if drivers_data:
+        for driver in drivers_data:
+            drivers_list.append(f"{driver['DriverID']:<10}{driver['DriverName']:<20}")
+    else:
+        drivers_list.append("Could not retrieve driver data.")
+
 
     back_button_box = Box(drivers_data_window, layout="auto", width = "fill")
     back_button = PushButton(back_button_box, text="Back to Drivers Menu", command=go_back_to_admin_drivers_menu_from_data)
     back_button.bg = BUTTON_BG_COLOR
     back_button.text_color = BUTTON_TEXT_COLOR
-
-    drivers_data = get_all_drivers()
-    if drivers_data:
-        for driver in drivers_data:
-            drivers_list.append(f"Driver ID: {driver['DriverID']}, Name: {driver['DriverName']}")
-    else:
-        drivers_list.append("Could not retrieve driver data.")
     drivers_data_window.show()
 
 def open_trips_data_window():
-    staff_trips_window.hide()
+    staff_trips_window.hide() 
     global trips_data_window
     trips_data_window = Window(app, title = "Trip Data", width=800, height = 600, bg=BG_COLOR)
     Text(trips_data_window, text="All Trips", color=TEXT_COLOR, size=14, font="Arial")
     trips_list = ListBox(trips_data_window, width="fill", height = "fill", scrollbar=True)
+    
+    header = f"{'Trip ID':<8}{'Coach ID':<10}{'Driver ID':<10}{'Destination ID':<15}{'Date':<12}"
+    trips_list.append(header)
+    trips_list.append("-" * 60)
 
-    back_button_box = Box(trips_data_window, layout = "auto", width="fill")
-    back_button = PushButton(back_button_box, text="Back to Trips Menu", command=go_back_to_admin_trips_menu_from_data)
-    back_button.bg = BUTTON_BG_COLOR
-    back_button.text_color = BUTTON_TEXT_COLOR
 
     trips_data = get_all_trips()
     if trips_data:
+
         for trip in trips_data:
-            trips_list.append(f"Trip ID: {trip['TripID']}, Coach ID: {trip['CoachID']}, Driver ID: {trip['DriverID']}, Destination ID: {trip['DestinationID']}, Date: {trip['Date']}")
+            row_string = (f"{trip['TripID']:<8}"
+                          f"{trip['CoachID']:<10}"
+                          f"{trip['DriverID']:<10}"
+                          f"{trip['DestinationID']:<15}"
+                          f"{trip['Date']}")
+            trips_list.append(row_string)
+
     else:
         trips_list.append("Could not retrieve trip data.")
+
+
+    back_button_box = Box(trips_data_window, layout = "auto", width="fill")
+    back_button = PushButton(back_button_box, text="Back to Trips Menu", command=go_back_to_staff_main_from_trips)
+    back_button.bg = BUTTON_BG_COLOR
+    back_button.text_color = BUTTON_TEXT_COLOR
     trips_data_window.show()
+
 
 #region Admin Windows
 # --- Admin Window Functions ---
@@ -295,7 +378,7 @@ def open_destinations_window():
     add_destinations_button = PushButton(button_box, text="Add Destinations", width=20, command=open_add_destination_window)
 
     remove_destinations_button = PushButton(button_box, text="Remove Destinations", width=20, command=open_remove_destination_window)
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_admin_main_from_destinations) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_admin_main_from_destinations)
     view_destinations_button.bg = BUTTON_BG_COLOR
     add_destinations_button.bg = BUTTON_BG_COLOR
     remove_destinations_button.bg = BUTTON_BG_COLOR
@@ -328,7 +411,7 @@ def open_drivers_window():
     view_drivers_button = PushButton(button_box, text="View Drivers", width=20, command=open_drivers_data_window)
     add_drivers_button = PushButton(button_box, text="Add Drivers", width=20, command=open_add_driver_window)
     remove_drivers_button = PushButton(button_box, text="Remove Drivers", width=20, command=open_remove_driver_window)
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_admin_main_from_drivers) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_admin_main_from_drivers)
     view_drivers_button.bg = BUTTON_BG_COLOR; view_drivers_button.text_color = BUTTON_TEXT_COLOR
     add_drivers_button.bg = BUTTON_BG_COLOR; add_drivers_button.text_color = BUTTON_TEXT_COLOR
     remove_drivers_button.bg = BUTTON_BG_COLOR; remove_drivers_button.text_color = BUTTON_TEXT_COLOR
@@ -364,7 +447,7 @@ def open_staff_customers_window():
     button_box = Box(staff_customers_window, layout="auto", width="fill")
     add_customer_button = PushButton(button_box, text="Add Customer", width=20, command=open_add_customer_window)
     remove_customer_button = PushButton(button_box, text="Remove Customer", width=20, command=open_remove_customer_window)
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_customers) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_customers)
     add_customer_button.bg = BUTTON_BG_COLOR; add_customer_button.text_color = BUTTON_TEXT_COLOR
     remove_customer_button.bg = BUTTON_BG_COLOR; remove_customer_button.text_color = BUTTON_TEXT_COLOR
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
@@ -373,14 +456,14 @@ def open_staff_customers_window():
 
 def open_staff_bookings_window(): # New function for staff bookings window
     staff_window.hide()
-    global staff_bookings_window # Make staff_bookings_window global so data window can go back
+    global staff_bookings_window # Made staff_bookings_window global so data window can go back
     staff_bookings_window = Window(app, title="Staff Bookings", width=800, height=600, bg=BG_COLOR)
     Text(staff_bookings_window, text="Bookings", color=TEXT_COLOR)
     button_box = Box(staff_bookings_window, layout="auto", width="fill")
     view_bookings_button = PushButton(button_box, text="View Bookings", width=20, command=open_bookings_data_window) # Call new window function
     add_booking_button = PushButton(button_box, text="Add Booking", width=20, command=open_add_booking_window)
     remove_booking_button = PushButton(button_box, text="Remove Booking", width=20, command=open_remove_booking_window)
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_bookings) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_bookings)
 
     view_bookings_button.bg = BUTTON_BG_COLOR; view_bookings_button.text_color = BUTTON_TEXT_COLOR
     add_booking_button.bg = BUTTON_BG_COLOR; add_booking_button.text_color = BUTTON_TEXT_COLOR
@@ -397,7 +480,7 @@ def open_staff_destinations_window():
     Text(staff_destinations_window, text="Destinations", color=TEXT_COLOR)
     button_box = Box(staff_destinations_window, layout="auto", width="fill")
     view_destinations_button = PushButton(button_box, text="View Destinations", width=20, command=open_destinations_data_window)
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_destinations) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_destinations)
     view_destinations_button.bg = BUTTON_BG_COLOR; view_destinations_button.text_color = BUTTON_TEXT_COLOR
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     staff_destinations_window.show()
@@ -412,7 +495,7 @@ def open_staff_trips_window():
     add_trips_button = PushButton(button_box, text="Add Trips", width=20, command=open_add_trip_window)
     remove_trips_button = PushButton(button_box, text="Remove Trips", width = 20)
 
-    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_trips) # Corrected
+    back_button = PushButton(button_box, text="Back", width=20, command=go_back_to_staff_main_from_trips)
     view_trips_button.bg = BUTTON_BG_COLOR; view_trips_button.text_color = BUTTON_TEXT_COLOR
 
     add_trips_button.bg = BUTTON_BG_COLOR; add_trips_button.text_color = BUTTON_TEXT_COLOR
@@ -430,7 +513,7 @@ def open_staff_window():
     bookings_button = PushButton(button_box, text="BOOKINGS", width=15, command=open_staff_bookings_window)
     destinations_button = PushButton(button_box, text="DESTINATIONS", width=15, command=open_staff_destinations_window)
     trips_button = PushButton(button_box, text="TRIPS", width=15, command=open_staff_trips_window)
-    search_button = PushButton(button_box, text="SEARCH", width=15, command=open_query_window)  # Add Search button here
+    search_button = PushButton(button_box, text="SEARCH", width=15, command=open_query_window)  # Added Search button here
     back_button = PushButton(button_box, text="Back", width=15, command=go_back_to_main_menu)
     customers_button.bg = BUTTON_BG_COLOR; customers_button.text_color = BUTTON_TEXT_COLOR
     bookings_button.bg = BUTTON_BG_COLOR; bookings_button.text_color = BUTTON_TEXT_COLOR
@@ -440,8 +523,6 @@ def open_staff_window():
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     staff_window.show()
 
-#region Add and Remove Windows
-#--------------------------Add and Remove Windows--------------------------------
 
 #region Add Windows
 def open_add_booking_window():
@@ -505,7 +586,6 @@ def open_add_coach_window():
 
     def add_coach():
         try:
-            # Corrected SQL query
             cursor.execute("""
             INSERT INTO coaches (Registration, Seats)
             VALUES (%s, %s)""",
@@ -556,7 +636,36 @@ def open_add_customer_window():
 
     def add_customer():
         try:
-            # Corrected SQL query with correct column names
+            # --- Input Validation ---
+            if not first_name_entry.value:
+                info("Input Error", "First Name is required.")
+                return
+            if not surname_entry.value:
+                info("Input Error", "Surname is required.")
+                return
+            if not email_entry.value:
+                info("Input Error", "Email is required.")
+                return
+            # Email validation using a regular expression (placed *after* empty check)
+            email = email_entry.value
+            email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            if not re.match(email_regex, email):
+                info("Input Error", "Invalid email format.")
+                return
+            if not address1_entry.value:
+                info("Input Error", "Address Line 1 is required.")
+                return
+            if not city_entry.value:
+                info("Input Error", "City is required.")
+                return
+            if not postcode_entry.value:
+                info("Input Error", "Postcode is required.")
+                return
+            if not phone_entry.value:
+                info("Input Error", "Phone Number is required.")
+                return
+
+
             cursor.execute("""
                 INSERT INTO customers (FirstName, Surname, Email, AddressLine1,
                                        AddressLine2, City, Postcode, PhoneNumber, SpecialNotes)
@@ -567,7 +676,7 @@ def open_add_customer_window():
             conn.commit()
             info("Success", "Customer added successfully.")
             add_customer_window.destroy()
-            staff_customers_window.show()  # or admin, depending on context
+            staff_customers_window.show() 
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
             info("Database Error", "Failed to add customer. Check Your Input")
@@ -579,6 +688,178 @@ def open_add_customer_window():
     back_button.bg = BUTTON_BG_COLOR
     back_button.text_color = BUTTON_TEXT_COLOR
     add_customer_window.show()
+
+
+def open_add_booking_window():
+    global add_booking_window, customer_combo, trip_combo, booking_cost_entry, num_people_entry, special_request_entry, date_of_booking_entry
+    add_booking_window = Window(app, title="Add Booking", width=450, height=450, bg=BG_COLOR) #Increased window size
+    Text(add_booking_window, text = "Enter Booking Details:", color = TEXT_COLOR)
+
+    Text(add_booking_window, text="Customer:", color=TEXT_COLOR)
+    customer_combo = Combo(add_booking_window, options=[], width="fill")
+    # Populate customer Combo
+    try:
+        cursor.execute("SELECT CustomerID, FirstName, Surname FROM customers")
+        customers = cursor.fetchall()
+        customer_combo.clear()
+        for customer in customers:
+             customer_combo.append(f"{customer['CustomerID']}: {customer['FirstName']} {customer['Surname']}")
+    except mysql.connector.Error as err:
+        info("Database Error", "Could not load customers.")
+        add_booking_window.destroy()
+        return  # Exit the function
+
+    Text(add_booking_window, text="Trip:", color=TEXT_COLOR)
+    trip_combo = Combo(add_booking_window, options=[], width="fill")
+     # Populate trip Combo
+    try:
+        # Only show future trips
+        cursor.execute("""
+            SELECT t.TripID, t.Date, d.DestinationName, d.DestinationID
+            FROM trips t
+            JOIN destinations d ON t.DestinationID = d.DestinationID
+            WHERE t.Date >= CURDATE()
+            ORDER BY t.Date
+        """)
+        trips = cursor.fetchall()
+        trip_combo.clear() #clear options
+        for trip in trips:
+            trip_combo.append(f"{trip['TripID']}: {trip['Date']} - {trip['DestinationName']}")
+    except mysql.connector.Error as err:
+        info("Database Error", "Could not load trips.")
+        add_booking_window.destroy()
+        return
+
+    #  Booking Cost TextBox
+    Text(add_booking_window, text="Booking Cost:", color=TEXT_COLOR)
+    booking_cost_entry = TextBox(add_booking_window)
+
+
+    Text(add_booking_window, text="Number of People:", color=TEXT_COLOR)
+    num_people_entry = TextBox(add_booking_window)
+
+    Text(add_booking_window, text="Special Request:", color=TEXT_COLOR)
+    special_request_entry = TextBox(add_booking_window)
+
+    # REMOVE manual date entry, set to today's date automatically
+    Text(add_booking_window, text="Date of Booking:", color=TEXT_COLOR)
+    date_of_booking_entry = Text(add_booking_window, text = "")  # Display-only Text widget
+
+    import datetime
+
+    # Set the current date
+    current_date = datetime.date.today().strftime("%Y-%m-%d")
+    date_of_booking_entry.value = current_date
+
+
+    # Function for adding booking.
+    def add_booking():
+        try:
+            # --- Input Validation ---
+            # Get selected CustomerID and TripID.  Handle potential errors.
+            selected_customer = customer_combo.value
+            if not selected_customer:
+                info("Input Error", "Please select a customer.")
+                return
+            customer_id = int(selected_customer.split(":")[0]) # Extract ID
+
+            selected_trip = trip_combo.value
+            if not selected_trip:
+                info("Input Error", "Please select a trip.")
+                return
+            trip_id = int(selected_trip.split(":")[0]) # Extract ID
+
+            if not booking_cost_entry.value.isdigit():
+                info("Input Error", "Booking cost must be a number.")
+                return
+            #Number of people validation (checking against coach capacity)
+            if not num_people_entry.value.isdigit():
+                info("Input Error", "Number of People must be an integer.")
+                return
+            num_people = int(num_people_entry.value) # Converting to int for the check
+
+            cursor.execute("SELECT CoachID from trips WHERE TripID = %s", (trip_id,))
+            result = cursor.fetchone()
+            if result:
+                coach_id = result['CoachID']
+                cursor.execute("SELECT Seats from coaches WHERE CoachID = %s", (coach_id,))
+                result = cursor.fetchone()
+                if result:
+                    available_seats = result['Seats']
+                    if num_people > available_seats:
+                        info("Input Error", f"The selected coach only has {available_seats} seats.")
+                        return # Exit if not enough seats
+
+            else:
+                info("Database Error", "Could not retrieve coach information")
+
+
+            cursor.execute("""
+            INSERT INTO bookings (CustomerID, TripID, BookingCost, NumberofPeople, SpecialRequest, BookingDate)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (customer_id, trip_id, booking_cost_entry.value,  # Use entered cost
+             num_people_entry.value, special_request_entry.value, current_date)) # Use current_date
+            conn.commit()
+            info("Booking Added", "The booking has been added.")
+            add_booking_window.destroy()
+            staff_bookings_window.show()
+
+        except mysql.connector.Error as err:
+             info("Database Error",f"Error Adding booking to the database. Check Your Input: {err}") #better error
+             print(f"Database Error: {err}")
+        except ValueError:
+            info("Input Error", "Invalid ID format selected.")
+        except IndexError: # added to handle the case if split fails
+            info("Input Error", "Invalid selection.")
+
+
+    add_button = PushButton(add_booking_window, text="Add Booking", command=add_booking)
+    back_button = PushButton(add_booking_window, text="Back", command=add_booking_window.destroy)
+    add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+    add_booking_window.show()
+
+
+def open_add_coach_window():
+    global add_coach_window, coach_reg_entry, seats_entry
+    add_coach_window = Window(app, title = "Add Coach", width = 400, height = 400, bg = BG_COLOR)
+    Text(add_coach_window, text="Enter Coach Details:", color = TEXT_COLOR)
+
+    Text(add_coach_window, text = "Coach Registration:", color = TEXT_COLOR)
+    coach_reg_entry = TextBox(add_coach_window)
+
+    Text(add_coach_window, text="Seats in Coach", color = TEXT_COLOR)
+    seats_entry = TextBox(add_coach_window)
+
+    def add_coach():
+        try:
+
+            if not coach_reg_entry.value:
+                info("Input Error", "Coach Registration Required")
+                return
+            if not seats_entry.value.isdigit():
+                info("Input Error", "Number of seats must be a number")
+                return
+            cursor.execute("""
+            INSERT INTO coaches (Registration, Seats)
+            VALUES (%s, %s)""",
+            (coach_reg_entry.value, seats_entry.value))
+            conn.commit()
+            info("Coach Added", "The coach has been added to the database.")
+            add_coach_window.destroy()
+            coaches_window.show()
+
+        except mysql.connector.Error as err:
+            print(f"Database Error: {err}")
+            info("Database Error", "There was an error when trying to add coach. Check Your Input")
+
+
+    add_button = PushButton(add_coach_window, text="Add Coach", command=add_coach)
+    back_button = PushButton(add_coach_window, text="Back", command=add_coach_window.destroy)
+    add_button.bg = BUTTON_BG_COLOR; add_button.text_color = BUTTON_TEXT_COLOR
+    back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+    add_coach_window.show()
 
 def open_add_destination_window():
     global add_destination_window, destination_name_entry, hotel_name_entry
@@ -604,7 +885,24 @@ def open_add_destination_window():
 
     def add_destination():
         try:
-            # Corrected SQL statement with correct column names
+            # --- Input Validation ---
+            if not destination_name_entry.value:
+                info("Input Error", "Destination Name is required.")
+                return
+            if not hotel_name_entry.value:
+                info("Input Error", "Hotel Name is required.")
+                return
+            if not destination_cost_entry.value.isdigit():
+                info("Input Error", "Destination Cost must be a number.")
+                return
+            if not city_name_entry.value:
+                info("Input Error", "City Name is required.")
+                return
+            if not days_entry.value.isdigit():
+                info("Input Error", "Days must be a number.")
+                return
+
+
             cursor.execute("""
             INSERT INTO destinations (DestinationName, Hotel, DestinationCost, CityName, Days)
             VALUES (%s, %s, %s, %s, %s)""",
@@ -636,6 +934,10 @@ def open_add_driver_window():
 
     def add_driver():
         try:
+            if not driver_name_entry.value:
+                info("Input Error", "Driver name is required")
+                return
+            
             cursor.execute("""
             INSERT INTO drivers (DriverName)
             VALUES (%s)""", (driver_name_entry.value,))
@@ -655,29 +957,87 @@ def open_add_driver_window():
     add_driver_window.show()
 
 def open_add_trip_window():
-    global add_trip_window, coach_id_entry, driver_id_entry, destination_id_entry, date_entry
+    global add_trip_window, coach_combo, driver_combo, destination_combo, date_entry
 
     add_trip_window = Window(app, title="Add Trip", width = 400, height = 400, bg = BG_COLOR)
     Text(add_trip_window, text = "Enter Trip Details: ", color = TEXT_COLOR)
 
-    Text(add_trip_window, text = "Coach ID:", color = TEXT_COLOR)
-    coach_id_entry = TextBox(add_trip_window)
+    Text(add_trip_window, text = "Coach:", color = TEXT_COLOR)
+    coach_combo = Combo(add_trip_window, options=[], width="fill")
+    #Populate the combo box
+    try:
+        cursor.execute("SELECT CoachID, Registration FROM coaches")
+        coaches = cursor.fetchall()
+        coach_combo.clear()
+        for coach in coaches:
+            coach_combo.append(f"{coach['CoachID']}: {coach['Registration']}")
+    except mysql.connector.Error as err:
+        info("Database Error", "Could not load coaches.")
+        add_trip_window.destroy()  #close window if error occurs
+        return # Exit if cant load data
+    
 
-    Text(add_trip_window, text = "Driver ID:", color = TEXT_COLOR)
-    driver_id_entry = TextBox(add_trip_window)
+    Text(add_trip_window, text = "Driver:", color = TEXT_COLOR)
+    driver_combo = Combo(add_trip_window, options=[], width="fill")
+    #Populate Driver Combo
+    try:
+        cursor.execute("SELECT DriverID, DriverName FROM drivers")
+        drivers = cursor.fetchall()
+        driver_combo.clear() #clear options
+        for driver in drivers:
+            driver_combo.append(f"{driver['DriverID']}: {driver['DriverName']}")
+    except mysql.connector.Error as err:
+        info("Database Error", "Could not load drivers")
+        add_trip_window.destroy()
+        return
 
-    Text(add_trip_window, text="Destination ID:", color=TEXT_COLOR)
-    destination_id_entry = TextBox(add_trip_window)
+    Text(add_trip_window, text="Destination:", color=TEXT_COLOR)
+    destination_combo = Combo(add_trip_window, options=[], width="fill")
+     #Populate Destination Combo
+    try:
+        cursor.execute("SELECT DestinationID, DestinationName FROM destinations")
+        destinations = cursor.fetchall()
+        destination_combo.clear()
+        for destination in destinations:
+            destination_combo.append(f"{destination['DestinationID']}: {destination['DestinationName']}")
+    except mysql.connector.Error as err:
+        info("Database Error", "Could not load destinations")
+        add_trip_window.destroy()
+        return
+    
 
     Text(add_trip_window, text = "Date (YYYY-MM-DD):", color = TEXT_COLOR)
     date_entry = TextBox(add_trip_window)
 
     def add_trip():
         try:
+            selected_coach = coach_combo.value
+            if not selected_coach:
+                info("Input Error", "Please select a coach.")
+                return
+            coach_id = int(selected_coach.split(":")[0])
+
+            selected_driver = driver_combo.value
+            if not selected_driver:
+                info("Input Error", "Please select a driver.")
+                return
+            driver_id = int(selected_driver.split(":")[0])
+
+            selected_destination = destination_combo.value
+            if not selected_destination:
+                info("Input Error", "Please select a destination")
+                return
+            destination_id = int(selected_destination.split(":")[0])
+            # Basic date format check.  Could be more robust.
+            date_pattern = r"^\d{4}-\d{2}-\d{2}$"  # YYYY-MM-DD
+            if not re.match(date_pattern, date_entry.value):
+                 info("Input Error", "Invalid date format. Use YYYY-MM-DD.")
+                 return
+
             cursor.execute("""
             INSERT INTO trips (CoachID, DriverID, DestinationID, Date)
             VALUES (%s, %s, %s, %s)""",
-            (coach_id_entry.value, driver_id_entry.value, destination_id_entry.value, date_entry.value))
+            (coach_id, driver_id, destination_id, date_entry.value))
             conn.commit()
             info("Success", "Trip has been added successfully.")
             add_trip_window.destroy()
@@ -686,6 +1046,10 @@ def open_add_trip_window():
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
             info("Database Error", "Failed to add Trip. Check Your Input")
+        except ValueError:
+            info("Input Error", "Invalid ID format selected.")
+        except IndexError:
+            info("Input Error", "Invalid selection.")
 
     add_button = PushButton(add_trip_window, text = "Add Trip", command = add_trip)
     back_button = PushButton(add_trip_window, text = "Back", command = add_trip_window.destroy)
@@ -712,7 +1076,7 @@ def open_remove_booking_window():
             conn.commit()
             info("Success", "Booking removed successfully.")
             remove_booking_window.destroy()
-            staff_bookings_window.show()  # Or admin_bookings_window, depending on context
+            staff_bookings_window.show()
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
             info("Database Error", "Failed to remove Booking.  Check that the Booking ID exists.")
@@ -761,7 +1125,7 @@ def open_remove_customer_window():
             conn.commit()
             info("Success", "Customer removed successfully.")
             remove_customer_window.destroy()
-            staff_customers_window.show() #or admin if admin
+            staff_customers_window.show()
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
             info("Database Error", "Failed to remove customer. Check that the Customer ID exists.")
@@ -846,7 +1210,7 @@ def open_query_window():
         Text(selection_window, text="Select Destination:", color=TEXT_COLOR)
 
         # Use a Combo box for destinations.
-        destination_combo = Combo(selection_window, options=[], width="fill")  # Fill options later
+        destination_combo = Combo(selection_window, options=[], width="fill") 
         Text(selection_window, text="Enter Date (YYYY-MM-DD):", color=TEXT_COLOR)
         date_entry = TextBox(selection_window)
 
@@ -856,23 +1220,22 @@ def open_query_window():
             destinations = cursor.fetchall()
             destination_options = [f"{dest['DestinationID']}: {dest['DestinationName']}" for dest in destinations]
 
-            # CORRECTED: Clear existing options and append new ones.
-            destination_combo.clear()  # Clear any previous options (important!)
+            destination_combo.clear() 
             for option in destination_options:
                 destination_combo.append(option)
 
         except mysql.connector.Error as err:
             info("Database Error", f"Error fetching destinations: {err}")
-            selection_window.destroy()  # Close if we can't get destinations
+            selection_window.destroy()  # Close if can't get destinations
             return
 
-        # 3.  The function that actually executes the query (now with parameters).
+        # 3.   function that  the query (with parameters).
         def run_passenger_query():
             try:
                 selected_destination = destination_combo.value
                 trip_date = date_entry.value
 
-                # Very important:  Error handling for empty input.
+                # Error handling for empty input.
                 if not selected_destination or not trip_date:
                     info("Input Error", "Please select a destination and enter a date.")
                     return
@@ -881,7 +1244,6 @@ def open_query_window():
                 destination_id = int(selected_destination.split(":")[0])
 
 
-                # Corrected SQL query with parameters for destination and date.  SAFE.
                 cursor.execute("""
                     SELECT c.FirstName, c.Surname
                     FROM customers c
@@ -889,7 +1251,7 @@ def open_query_window():
                     JOIN trips t ON b.TripID = t.TripID
                     JOIN destinations d ON t.DestinationID = d.DestinationID
                     WHERE d.DestinationID = %s AND t.Date = %s
-                """, (destination_id, trip_date))  # Use parameters!
+                """, (destination_id, trip_date))
                 passengers = cursor.fetchall()
 
                 result_window = Window(query_window, title="Passengers", width=400, height=300, bg=BG_COLOR)
@@ -961,12 +1323,12 @@ def open_query_window():
                     info("Input Error", "Please enter a postcode.")
                     return
 
-                # Use parameterized query for safety!
+                # Using parameterised query for safety!
                 cursor.execute("""
                     SELECT FirstName, Surname, AddressLine1, AddressLine2, City, Postcode
                     FROM customers
                     WHERE Postcode LIKE %s
-                """, (postcode + '%',))  # Add % for wildcard matching
+                """, (postcode + '%',))  # Added % for wildcard matching
                 customers = cursor.fetchall()
 
                 result_window = Window(query_window, title=f"Customers in {postcode}", width=600, height=400, bg=BG_COLOR)
@@ -995,7 +1357,7 @@ def open_query_window():
 
   # --- Query 4:  Current Income for a specific trip
     def trip_income_window():
-      #Create a window prompting for the trip ID to run calculations for
+      #Created a window prompting for the trip ID to run calculations for
         income_window = Window(query_window, title = "Calculate Trip Income", width = 400, height = 200, bg = BG_COLOR)
         Text(income_window, text="Enter Trip ID:", color=TEXT_COLOR)
         trip_id_entry = TextBox(income_window)
@@ -1034,15 +1396,15 @@ def open_query_window():
 
 
     # --- Buttons for each query ---
-    passengers_button = PushButton(query_window, text="Passengers by Trip", command=lincoln_passengers) # Changed text
+    passengers_button = PushButton(query_window, text="Passengers by Trip", command=lincoln_passengers) 
     trips_button = PushButton(query_window, text="Available Trips", command=available_trips)
-    postcode_button = PushButton(query_window, text="Customers by Postcode", command=postcode_customers)  # Changed text and command
+    postcode_button = PushButton(query_window, text="Customers by Postcode", command=postcode_customers)  
     income_button = PushButton(query_window, text = "Calculate Trip Income", command = trip_income_window)
     back_button = PushButton(query_window, text="Back", command=query_window.destroy)
 
     passengers_button.bg = BUTTON_BG_COLOR; passengers_button.text_color = BUTTON_TEXT_COLOR
     trips_button.bg = BUTTON_BG_COLOR; trips_button.text_color = BUTTON_TEXT_COLOR
-    postcode_button.bg = BUTTON_BG_COLOR;  postcode_button.text_color = BUTTON_TEXT_COLOR # Changed button
+    postcode_button.bg = BUTTON_BG_COLOR;  postcode_button.text_color = BUTTON_TEXT_COLOR 
     income_button.bg = BUTTON_BG_COLOR; income_button.text_color = BUTTON_TEXT_COLOR;
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     query_window.show()
@@ -1056,7 +1418,7 @@ def open_admin_login_window():
     Text(admin_login_window, text="Password:", color=TEXT_COLOR)
     password_entry = TextBox(admin_login_window, hide_text=True)
     login_button = PushButton(admin_login_window, text="Login", command=check_admin_login)
-    back_button = PushButton(admin_login_window, text="Back", command=go_back_to_main_menu) # Corrected
+    back_button = PushButton(admin_login_window, text="Back", command=go_back_to_main_menu) 
     login_button.bg = BUTTON_BG_COLOR; login_button.text_color = BUTTON_TEXT_COLOR
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     admin_login_window.show()
