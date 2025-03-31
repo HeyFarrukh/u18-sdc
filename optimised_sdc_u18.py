@@ -1975,9 +1975,9 @@ def open_query_window(parent_window):
     query_window = Window(app, title="Database Queries", width=800, height=600, bg=BG_COLOR) # Use app as master
     Text(query_window, text="Select a Query:", color=TEXT_COLOR)
 
-    # --- Query 1: Passengers by Trip ---
+    # --- Query 1: Passengers by Trip --- (MODIFIED)
     def lincoln_passengers():
-        selection_window = Window(query_window, title="Select Trip for Passenger List", width=400, height=200, bg=BG_COLOR)
+        selection_window = Window(query_window, title="Select Trip for Passenger List", width=450, height=200, bg=BG_COLOR)
         Text(selection_window, text="Select Trip:", color=TEXT_COLOR)
         trip_query_combo = Combo(selection_window, options=[], width="fill")
 
@@ -1989,35 +1989,84 @@ def open_query_window(parent_window):
             """)
             trips_for_combo = cursor.fetchall()
             trip_query_combo.clear(); trip_query_combo.append("")
-            for trip in trips_for_combo: trip_query_combo.append(f"{trip['TripID']}: {trip['Date']} - {trip['DestinationName']}")
+            if trips_for_combo:
+                for trip in trips_for_combo:
+                    trip_query_combo.append(f"{trip['TripID']}: {trip['Date']} - {trip['DestinationName']}")
+            else:
+                trip_query_combo.append("No trips available")
+                trip_query_combo.disable()
         except mysql.connector.Error as err:
             info("Database Error", f"Error fetching trips: {err}"); selection_window.destroy(); return
 
         def run_passenger_query():
-            selected_trip = trip_query_combo.value
-            if not selected_trip: info("Input Error", "Please select a trip."); return
+            selected_trip_text = trip_query_combo.value
+            if not selected_trip_text or ":" not in selected_trip_text:
+                info("Input Error", "Please select a trip.")
+                return
+
             try:
-                trip_id = int(selected_trip.split(":")[0])
+                # Extract Trip ID and Destination Name from the combo text
+                parts = selected_trip_text.split(":", 1)
+                trip_id = int(parts[0])
+                trip_desc = parts[1].strip() # Contains "YYYY-MM-DD - DestinationName"
+                dest_name_parts = trip_desc.split(" - ", 1)
+                destination_name = dest_name_parts[1] if len(dest_name_parts) > 1 else "Unknown Destination"
+
                 cursor.execute("""
-                    SELECT c.CustomerID, c.FirstName, c.Surname FROM customers c
-                    JOIN bookings b ON c.CustomerID = b.CustomerID WHERE b.TripID = %s
+                    SELECT c.CustomerID, c.FirstName, c.Surname, b.NumberofPeople
+                    FROM customers c
+                    JOIN bookings b ON c.CustomerID = b.CustomerID
+                    WHERE b.TripID = %s
                     ORDER BY c.Surname, c.FirstName
                 """, (trip_id,))
                 passengers = cursor.fetchall()
 
-                result_window = Window(query_window, title=f"Passengers on Trip {trip_id}", width=400, height=300, bg=BG_COLOR)
-                result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
-                if passengers:
-                    result_list.append(f"{'ID':<5}{'Name':<25}"); result_list.append("-" * 30)
-                    for p in passengers: result_list.append(f"{p['CustomerID']:<5}{p['FirstName']} {p['Surname']}")
-                else: result_list.append("No passengers booked on this trip.")
-                close_button = PushButton(result_window, text="Close", command=result_window.destroy, align="bottom")
-                close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
-                result_window.show(); selection_window.destroy()
-            except (ValueError, IndexError): info("Input Error", "Invalid trip selection.")
-            except mysql.connector.Error as err: info("Database Error", f"Error fetching passenger data: {err}")
+                # --- Create Grid View Window ---
+                result_window = Window(query_window, title=f"Passengers - Trip {trip_id}: {destination_name}", width=600, height=450, bg=BG_COLOR)
 
-        btn_box = Box(selection_window, layout="grid", width="fill")
+                # Main container for the grid
+                grid_container = Box(result_window, width="fill", height="fill", border=1) # Use fill for height
+                grid_box = Box(grid_container, layout="grid", width="fill", align="top")
+
+                # Pagination container (empty, but keeps layout consistent)
+                pagination_box = Box(result_window, width="fill", align="bottom")
+
+                # Back button container
+                back_button_box = Box(result_window, width="fill", align="bottom")
+
+                headers = ["ID", "First Name", "Surname", "# People"]
+                data_keys = ["CustomerID", "FirstName", "Surname", "NumberofPeople"]
+
+                # Create Headers
+                for col, header in enumerate(headers):
+                    Text(grid_box, text=header, grid=[col, 0], color=TEXT_COLOR, size=11, font="Arial", bold=True, align="left")
+
+                # Create Data Rows
+                if passengers:
+                    for row, passenger_dict in enumerate(passengers, start=1):
+                        for col, key in enumerate(data_keys):
+                            data_to_display = str(passenger_dict.get(key, ''))
+                            Text(grid_box, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10, align="left")
+                else:
+                    # Display message within the grid box if no results
+                    Text(grid_box, text="No passengers booked on this trip.", color=TEXT_COLOR, grid=[0, 1, len(headers), 1], align="left")
+
+                # Add a single Back/Close button
+                close_button = PushButton(back_button_box, text="Close", command=result_window.destroy, align="right")
+                close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
+
+                result_window.show()
+                selection_window.destroy() # Close the selection window
+
+            except (ValueError, IndexError):
+                info("Input Error", "Invalid trip selection format.")
+            except mysql.connector.Error as err:
+                info("Database Error", f"Error fetching passenger data: {err}")
+            except Exception as e:
+                 info("Error", f"An unexpected error occurred: {e}")
+                 import traceback; traceback.print_exc()
+
+        btn_box = Box(selection_window, layout="grid", width="fill", align="bottom")
         ok_button = PushButton(btn_box, text="Show Passengers", grid=[0,0], command=run_passenger_query)
         cancel_button = PushButton(btn_box, text="Cancel", grid=[1,0], command=selection_window.destroy)
         ok_button.bg = BUTTON_BG_COLOR; ok_button.text_color = BUTTON_TEXT_COLOR
@@ -2088,7 +2137,7 @@ def open_query_window(parent_window):
 
                     # Create Headers
                     for col, header in enumerate(headers):
-                        Text(grid_box, text=header, grid=[col, 0], color=TEXT_COLOR, size=11, font="Arial", bold=True)
+                        Text(grid_box, text=header, grid=[col, 0], color=TEXT_COLOR, size=11, font="Arial", bold=True, align="left")
 
                     # Create Data Rows
                     for row, customer_dict in enumerate(customers, start=1):
@@ -2097,11 +2146,11 @@ def open_query_window(parent_window):
 
                         for col, key in enumerate(data_keys):
                             data_to_display = str(customer_dict.get(key, ''))
-                            Text(grid_box, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10)
+                            Text(grid_box, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10, align="left")
                 else:
                     # Display message within the grid box if no results on this page (shouldn't happen if total_records > 0)
                     if page == 0:
-                       Text(grid_box, text=f"No customers found starting with postcode {postcode}.", color=TEXT_COLOR, grid=[0, 1, 4, 1])
+                       Text(grid_box, text=f"No customers found starting with postcode {postcode}.", color=TEXT_COLOR, grid=[0, 1, len(headers), 1], align="left")
 
                 # --- Create Pagination Controls ---
                 if page > 0:
@@ -2136,7 +2185,8 @@ def open_query_window(parent_window):
 
             # Create the results window structure *before* fetching data
             result_window = Window(query_window, title=f"Customers in {postcode}*", width=700, height=500, bg=BG_COLOR) # Adjusted size
-            grid_box = Box(result_window, layout="grid", width="fill", align="top", border=1)
+            grid_container = Box(result_window, width="fill", height="fill", border=1) # Use fill for height
+            grid_box = Box(grid_container, layout="grid", width="fill", align="top")
             pagination_box = Box(result_window, layout="grid", width="fill", align="bottom")
             back_button_box = Box(result_window, width="fill", align="bottom") # Box for the back button
 
@@ -2151,7 +2201,7 @@ def open_query_window(parent_window):
             postcode_window.destroy()
 
 
-        btn_box = Box(postcode_window, layout="grid", width="fill")
+        btn_box = Box(postcode_window, layout="grid", width="fill", align="bottom")
         ok_button = PushButton(btn_box, text="Find Customers", grid=[0,0], command=run_postcode_query)
         cancel_button = PushButton(btn_box, text="Cancel", grid=[1,0], command=postcode_window.destroy)
         ok_button.bg = BUTTON_BG_COLOR; ok_button.text_color = BUTTON_TEXT_COLOR
@@ -2172,13 +2222,20 @@ def open_query_window(parent_window):
             """)
             trips_for_income = cursor.fetchall()
             trip_income_combo.clear(); trip_income_combo.append("")
-            for trip in trips_for_income: trip_income_combo.append(f"{trip['TripID']}: {trip['Date']} - {trip['DestinationName']}")
+            if trips_for_income:
+                for trip in trips_for_income:
+                    trip_income_combo.append(f"{trip['TripID']}: {trip['Date']} - {trip['DestinationName']}")
+            else:
+                trip_income_combo.append("No trips available")
+                trip_income_combo.disable()
         except mysql.connector.Error as err:
             info("Database Error", f"Error fetching trips: {err}"); income_window.destroy(); return
 
         def calculate_income():
             selected_trip_income = trip_income_combo.value
-            if not selected_trip_income: info("Input Error", "Please select a trip."); return
+            if not selected_trip_income or ":" not in selected_trip_income:
+                info("Input Error", "Please select a trip.")
+                return
             try:
                 trip_id = int(selected_trip_income.split(":")[0])
                 cursor.execute("SELECT SUM(b.BookingCost) AS TotalIncome FROM bookings b WHERE b.TripID = %s", (trip_id,))
@@ -2188,7 +2245,7 @@ def open_query_window(parent_window):
             except (ValueError, IndexError): info("Input Error", "Invalid trip selection.")
             except mysql.connector.Error as err: info("Database Error", f"Error calculating income: {err}")
 
-        btn_box = Box(income_window, layout="grid", width="fill")
+        btn_box = Box(income_window, layout="grid", width="fill", align="bottom")
         calculate_button = PushButton(btn_box, text = "Calculate Income", grid=[0,0], command = calculate_income)
         cancel_button = PushButton(btn_box, text = "Close", grid=[1,0], command = income_window.destroy)
         calculate_button.bg = BUTTON_BG_COLOR; calculate_button.text_color = BUTTON_TEXT_COLOR
