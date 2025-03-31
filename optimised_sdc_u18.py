@@ -39,8 +39,9 @@ except mysql.connector.Error as err:
     exit() # Stop the script
 
 # --- Pagination Globals ---
-current_page = 0
-records_per_page = 15 # How many records to show per page
+current_page = 0 # General current page for main table views
+records_per_page = 15 # How many records to show per page in main table views
+query_records_per_page = 10 # Specific pagination for query results
 
 # --- Helper Functions for Table Display & Pagination ---
 
@@ -1977,25 +1978,101 @@ def open_query_window(parent_window):
         Text(postcode_window, text="Enter Postcode (e.g., 'SW1A'):", color=TEXT_COLOR)
         postcode_entry = TextBox(postcode_window, width='fill')
 
+        # This function will handle displaying a specific page of results
+        def display_postcode_results(postcode, page, result_window, grid_box, pagination_box):
+            try:
+                offset = page * query_records_per_page
+                postcode_like = postcode + '%'
+
+                # Get total count for pagination
+                count_query = "SELECT COUNT(*) as total FROM customers WHERE UPPER(Postcode) LIKE %s"
+                cursor.execute(count_query, (postcode_like,))
+                total_records = cursor.fetchone()['total']
+                total_pages = (total_records + query_records_per_page - 1) // query_records_per_page
+
+                # Fetch records for the current page
+                data_query = """
+                    SELECT CustomerID, FirstName, Surname, AddressLine1, Postcode
+                    FROM customers
+                    WHERE UPPER(Postcode) LIKE %s
+                    ORDER BY Postcode, Surname
+                    LIMIT %s OFFSET %s
+                """
+                cursor.execute(data_query, (postcode_like, query_records_per_page, offset))
+                customers = cursor.fetchall()
+
+                # Clear previous results
+                clear_box(grid_box)
+                clear_box(pagination_box)
+
+                if customers:
+                    headers = ["ID", "Name", "Address", "Postcode"]
+                    data_keys = ["CustomerID", "Name", "AddressLine1", "Postcode"]
+
+                    # Create Headers
+                    for col, header in enumerate(headers):
+                        Text(grid_box, text=header, grid=[col, 0], color=TEXT_COLOR, size=11, font="Arial", bold=True)
+
+                    # Create Data Rows
+                    for row, customer_dict in enumerate(customers, start=1):
+                        full_name = f"{customer_dict.get('FirstName', '')} {customer_dict.get('Surname', '')}"
+                        customer_dict['Name'] = full_name
+
+                        for col, key in enumerate(data_keys):
+                            data_to_display = str(customer_dict.get(key, ''))
+                            Text(grid_box, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10)
+                else:
+                    # Display message within the grid box if no results on this page (shouldn't happen if total_records > 0)
+                    if page == 0:
+                       Text(grid_box, text=f"No customers found starting with postcode {postcode}.", color=TEXT_COLOR, grid=[0, 1, 4, 1])
+
+                # --- Create Pagination Controls ---
+                if page > 0:
+                    prev_button = PushButton(pagination_box, text="<< Previous",
+                                             command=lambda p=page: display_postcode_results(postcode, p - 1, result_window, grid_box, pagination_box),
+                                             grid=[0, 0], align="left")
+                    prev_button.bg = BUTTON_BG_COLOR; prev_button.text_color = BUTTON_TEXT_COLOR
+
+                Text(pagination_box, text=f"Page {page + 1} of {max(1, total_pages)}", grid=[1, 0], align="left", color=TEXT_COLOR)
+
+                if page < total_pages - 1:
+                    next_button = PushButton(pagination_box, text="Next >>",
+                                             command=lambda p=page: display_postcode_results(postcode, p + 1, result_window, grid_box, pagination_box),
+                                             grid=[2, 0], align="left")
+                    next_button.bg = BUTTON_BG_COLOR; next_button.text_color = BUTTON_TEXT_COLOR
+
+            except mysql.connector.Error as err:
+                clear_box(grid_box)
+                clear_box(pagination_box)
+                Text(grid_box, text=f"Database Error:\n{err}", color="red", size=12, grid=[0, 0])
+                print(f"DB Error displaying postcode results: {err}")
+            except Exception as e:
+                clear_box(grid_box)
+                clear_box(pagination_box)
+                Text(grid_box, text=f"Error:\n{e}", color="red", size=12, grid=[0, 0])
+                import traceback; traceback.print_exc()
+
+
         def run_postcode_query():
             postcode = postcode_entry.value.strip().upper()
             if not postcode: info("Input Error", "Please enter a postcode area."); return
-            try:
-                cursor.execute("""
-                    SELECT CustomerID, FirstName, Surname, AddressLine1, Postcode FROM customers
-                    WHERE UPPER(Postcode) LIKE %s ORDER BY Postcode, Surname
-                """, (postcode + '%',))
-                customers = cursor.fetchall()
-                result_window = Window(query_window, title=f"Customers in {postcode}*", width=600, height=400, bg=BG_COLOR)
-                result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
-                if customers:
-                     result_list.append(f"{'ID':<5}{'Name':<30}{'Address':<35}{'Postcode':<10}"); result_list.append("-" * 80)
-                     for c in customers: result_list.append(f"{c['CustomerID']:<5}{c['FirstName']} {c['Surname']:<28}{c['AddressLine1']:<35}{c['Postcode']:<10}")
-                else: result_list.append(f"No customers found starting with postcode {postcode}.")
-                close_button = PushButton(result_window, text="Close", command=result_window.destroy, align="bottom")
-                close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
-                result_window.show(); postcode_window.destroy()
-            except mysql.connector.Error as err: info("Database Error", f"Error fetching customer data: {err}")
+
+            # Create the results window structure *before* fetching data
+            result_window = Window(query_window, title=f"Customers in {postcode}*", width=700, height=500, bg=BG_COLOR) # Adjusted size
+            grid_box = Box(result_window, layout="grid", width="fill", align="top", border=1)
+            pagination_box = Box(result_window, layout="grid", width="fill", align="bottom")
+            back_button_box = Box(result_window, width="fill", align="bottom") # Box for the back button
+
+            # Call the display function for the first page
+            display_postcode_results(postcode, 0, result_window, grid_box, pagination_box)
+
+            # Add a single Back/Close button
+            back_button = PushButton(back_button_box, text="Back to Queries", command=result_window.destroy, align="right")
+            back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
+
+            result_window.show()
+            postcode_window.destroy()
+
 
         btn_box = Box(postcode_window, layout="grid", width="fill")
         ok_button = PushButton(btn_box, text="Find Customers", grid=[0,0], command=run_postcode_query)
