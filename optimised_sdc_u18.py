@@ -744,16 +744,16 @@ def open_staff_window():
     bookings_button = PushButton(button_box, text="BOOKINGS", width=15, command=open_staff_bookings_window)
     destinations_button = PushButton(button_box, text="DESTINATIONS", width=15, command=open_staff_destinations_window)
     trips_button = PushButton(button_box, text="TRIPS", width=15, command=open_staff_trips_window)
-    # Pass staff_window as the parent to return to
-    search_button = PushButton(button_box, text="QUERIES", width=15,
-                               command=lambda: open_query_window(staff_window)) # MODIFIED
+    # Removed the Queries button for staff
+    # search_button = PushButton(button_box, text="QUERIES", width=15,
+    #                            command=lambda: open_query_window(staff_window)) # MODIFIED
     back_button = PushButton(button_box, text="Logout", width=15, command=lambda: go_back_to_main_menu(staff_window))
 
     customers_button.bg = BUTTON_BG_COLOR; customers_button.text_color = BUTTON_TEXT_COLOR
     bookings_button.bg = BUTTON_BG_COLOR; bookings_button.text_color = BUTTON_TEXT_COLOR
     destinations_button.bg = BUTTON_BG_COLOR; destinations_button.text_color = BUTTON_TEXT_COLOR
     trips_button.bg = BUTTON_BG_COLOR; trips_button.text_color = BUTTON_TEXT_COLOR
-    search_button.bg = BUTTON_BG_COLOR; search_button.text_color = BUTTON_TEXT_COLOR
+    # search_button.bg = BUTTON_BG_COLOR; search_button.text_color = BUTTON_TEXT_COLOR # No longer exists for staff
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     staff_window.show()
 
