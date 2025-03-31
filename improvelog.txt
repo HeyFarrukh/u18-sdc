@@ -6,3 +6,4 @@ Shows Remaining Seats
 Detailed & Specific error messages so if a certain field is empty then alerts user to fill it
 Queries limited to admin only
 When user views data like for Bookings, they can search by columns.
+Notification for when no available future trips
