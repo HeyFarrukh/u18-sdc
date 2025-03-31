@@ -840,14 +840,34 @@ def open_add_customer_window(parent_window):
                 address2 = address2_entry.value.strip()
                 notes = notes_entry.value.strip()
 
-                if not all([first_name, surname, email, address1, city, postcode, phone]):
-                    info("Input Error", "Please fill in all required fields (First Name, Surname, Email, Address 1, City, Postcode, Phone).")
+                # --- Improved Validation ---
+                if not first_name:
+                    info("Input Error", "First Name is required.")
                     return
-
+                if not surname:
+                    info("Input Error", "Surname is required.")
+                    return
+                if not email:
+                    info("Input Error", "Email is required.")
+                    return
                 email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
                 if not re.match(email_regex, email):
                     info("Input Error", "Invalid email format.")
                     return
+                if not address1:
+                    info("Input Error", "Address Line 1 is required.")
+                    return
+                if not city:
+                    info("Input Error", "City is required.")
+                    return
+                if not postcode:
+                    info("Input Error", "Postcode is required.")
+                    return
+                if not phone:
+                    info("Input Error", "Phone Number is required.")
+                    return
+                # --- End Improved Validation ---
+
 
                 cursor.execute("""
                     INSERT INTO customers (FirstName, Surname, Email, AddressLine1,
@@ -862,7 +882,11 @@ def open_add_customer_window(parent_window):
             except mysql.connector.Error as err:
                 conn.rollback()
                 print(f"Database error adding customer: {err}")
-                info("Database Error", f"Failed to add customer.\nError: {err.msg}")
+                # More specific DB errors
+                if err.errno == errorcode.ER_DUP_ENTRY:
+                     info("Database Error", f"Failed to add customer.\nPossible duplicate entry: {err.msg}")
+                else:
+                     info("Database Error", f"Failed to add customer.\nError: {err.msg}")
             except Exception as e:
                 print(f"Unexpected error adding customer: {e}")
                 info("Error", f"An unexpected error occurred: {e}")
@@ -1038,37 +1062,39 @@ def open_add_booking_window(parent_window):
             booking_date_str = booking_date_entry_widget.value # Get automatically set value
 
             try:
-                # --- Input Validation ---
-                if trip_combo_widget.enabled == False or not selected_trip or ":" not in selected_trip:
-                    info("Input Error", "Please select a valid upcoming trip.")
-                    return
+                # --- Input Validation (Improved) ---
                 if not selected_customer:
-                     info("Input Error", "Please select a customer.")
+                     info("Input Error", "Please select a Customer.")
                      return
+                if trip_combo_widget.enabled == False or not selected_trip or ":" not in selected_trip:
+                    info("Input Error", "Please select a valid Trip.")
+                    return
+                if not num_people_str:
+                    info("Input Error", "Number of People is required.")
+                    return
+                if not num_people_str.isdigit() or int(num_people_str) <= 0:
+                    info("Input Error", "Number of People must be a positive whole number.")
+                    return
 
                 customer_id = int(selected_customer.split(":")[0])
                 trip_id = int(selected_trip.split(":")[0]) # Already validated if we have available seats info
-
-                if not num_people_str.isdigit() or int(num_people_str) <= 0:
-                    info("Input Error", "Number of People must be a positive integer.")
-                    return
                 num_people = int(num_people_str)
 
                 # --- Check Capacity AGAIN (as a final confirmation) ---
-                # Use the value calculated when the trip was selected
                 if num_people > current_available_seats:
                     info("Input Error", f"Not enough seats available ({current_available_seats} left). Cannot book {num_people}.")
                     return
 
                 # Validate the automatically populated date field is not empty
                 if not booking_date_str:
-                     info("Input Error", "Booking Date could not be determined from Trip. Please re-select Trip.")
+                     info("Input Error", "Booking Date could not be determined. Please re-select Trip.")
                      return
                 try:
                     datetime.datetime.strptime(booking_date_str, "%Y-%m-%d").date()
                 except ValueError:
                     info("Input Error", "Invalid Booking Date format derived from trip. Please re-select trip.")
                     return
+                # --- End Input Validation ---
 
 
                 # --- Calculate Cost ---
@@ -1091,7 +1117,11 @@ def open_add_booking_window(parent_window):
             except TypeError: info("Error", "Cost calculation error or invalid data.")
             except mysql.connector.Error as err:
                 conn.rollback()
-                info("Database Error",f"Error Adding booking: {err.msg}")
+                # More specific DB errors
+                if err.errno == 1452: # Foreign key constraint fails
+                     info("Database Error", "Invalid Customer or Trip ID selected.")
+                else:
+                     info("Database Error",f"Error Adding booking: {err.msg}")
             except Exception as e: # Catch other potential errors
                 info("Error", f"An unexpected error occurred: {e}")
 
@@ -1144,9 +1174,17 @@ def open_add_coach_window(parent_window):
                 registration = coach_reg_entry.value.strip()
                 seats_str = seats_entry.value.strip()
 
-                if not registration: info("Input Error", "Coach Registration Required"); return
+                # --- Improved Validation ---
+                if not registration:
+                    info("Input Error", "Coach Registration is required.")
+                    return
+                if not seats_str:
+                    info("Input Error", "Number of Seats is required.")
+                    return
                 if not seats_str.isdigit() or int(seats_str) <= 0:
-                    info("Input Error", "Number of seats must be a positive number"); return
+                    info("Input Error", "Number of seats must be a positive whole number.")
+                    return
+                # --- End Improved Validation ---
 
                 cursor.execute("INSERT INTO coaches (Registration, Seats) VALUES (%s, %s)",
                                (registration, int(seats_str)))
@@ -1156,8 +1194,10 @@ def open_add_coach_window(parent_window):
                 go_back(add_coach_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
                 conn.rollback()
-                if err.errno == errorcode.ER_DUP_ENTRY: info("Database Error", "Registration already exists.")
-                else: info("Database Error", f"Failed to add coach: {err.msg}")
+                if err.errno == errorcode.ER_DUP_ENTRY:
+                     info("Database Error", "Coach Registration already exists.")
+                else:
+                     info("Database Error", f"Failed to add coach: {err.msg}")
             except Exception as e:
                 info("Error", f"An unexpected error occurred: {e}")
 
@@ -1221,16 +1261,33 @@ def open_add_destination_window(parent_window):
                 city = city_name_entry.value.strip()
                 days_str = days_entry.value.strip()
 
-                if not all([name, hotel, cost_str, city, days_str]):
-                    info("Input Error", "Please fill all fields."); return
+                # --- Improved Validation ---
+                if not name:
+                    info("Input Error", "Destination Name is required.")
+                    return
+                if not hotel:
+                    info("Input Error", "Hotel Name is required.")
+                    return
+                if not cost_str:
+                     info("Input Error", "Destination Cost is required.")
+                     return
                 try:
                     cost = float(cost_str)
                     if cost < 0: raise ValueError("Cost cannot be negative")
                 except ValueError:
-                    info("Input Error", "Cost must be a non-negative number."); return
+                    info("Input Error", "Cost must be a non-negative number (e.g., 50.00 or 50).")
+                    return
+                if not city:
+                     info("Input Error", "City Name is required.")
+                     return
+                if not days_str:
+                    info("Input Error", "Number of Days is required.")
+                    return
                 if not days_str.isdigit() or int(days_str) <= 0:
-                    info("Input Error", "Days must be a positive number."); return
+                    info("Input Error", "Days must be a positive whole number.")
+                    return
                 days = int(days_str)
+                # --- End Improved Validation ---
 
                 cursor.execute("""
                 INSERT INTO destinations (DestinationName, Hotel, DestinationCost, CityName, Days)
@@ -1285,7 +1342,11 @@ def open_add_driver_window(parent_window):
         def add_driver():
             try:
                 name = driver_name_entry.value.strip()
-                if not name: info("Input Error", "Driver name is required."); return
+                # --- Improved Validation ---
+                if not name:
+                    info("Input Error", "Driver Name is required.")
+                    return
+                # --- End Improved Validation ---
 
                 cursor.execute("INSERT INTO drivers (DriverName) VALUES (%s)", (name,))
                 conn.commit()
@@ -1375,22 +1436,38 @@ def open_add_trip_window(parent_window):
                 selected_destination = destination_combo.value
                 trip_date_str = date_entry.value.strip() # Use strip()
 
-                # Validation
-                if not all([selected_coach, selected_driver, selected_destination, trip_date_str]) or ":" not in selected_coach or ":" not in selected_driver or ":" not in selected_destination:
-                    info("Input Error", "Please select all options and enter a date."); return
-
-                coach_id = int(selected_coach.split(":")[0])
-                driver_id = int(selected_driver.split(":")[0])
-                destination_id = int(selected_destination.split(":")[0])
+                # --- Improved Validation ---
+                if not selected_coach or ":" not in selected_coach:
+                    info("Input Error", "Please select a Coach.")
+                    return
+                if not selected_driver or ":" not in selected_driver:
+                    info("Input Error", "Please select a Driver.")
+                    return
+                if not selected_destination or ":" not in selected_destination:
+                    info("Input Error", "Please select a Destination.")
+                    return
+                if not trip_date_str:
+                    info("Input Error", "Please enter a Date.")
+                    return
 
                 date_pattern = r"^\d{4}-\d{2}-\d{2}$"
-                if not re.match(date_pattern, trip_date_str): info("Input Error", "Invalid date format. Use YYYY-MM-DD."); return
+                if not re.match(date_pattern, trip_date_str):
+                    info("Input Error", "Invalid date format. Use YYYY-MM-DD.")
+                    return
                 try:
                     trip_date = datetime.datetime.strptime(trip_date_str, "%Y-%m-%d").date()
                     if trip_date < datetime.date.today():
                          info("Input Error", "Cannot add a trip with a date in the past.")
                          return
-                except ValueError: info("Input Error", "Invalid date value."); return
+                except ValueError:
+                    info("Input Error", "Invalid date value (e.g., February 30th).")
+                    return
+
+                coach_id = int(selected_coach.split(":")[0])
+                driver_id = int(selected_driver.split(":")[0])
+                destination_id = int(selected_destination.split(":")[0])
+                # --- End Improved Validation ---
+
 
                 cursor.execute("INSERT INTO trips (CoachID, DriverID, DestinationID, Date) VALUES (%s, %s, %s, %s)",
                                (coach_id, driver_id, destination_id, trip_date_str))
@@ -1402,7 +1479,7 @@ def open_add_trip_window(parent_window):
             except (ValueError, IndexError): info("Input Error", "Invalid selection or ID format.")
             except mysql.connector.Error as err:
                 conn.rollback()
-                if err.errno == errorcode.ER_DUP_ENTRY: info("Database Error", "Trip details might already exist.")
+                if err.errno == errorcode.ER_DUP_ENTRY: info("Database Error", "Trip details might already exist (e.g., same coach/driver/date).")
                 elif err.errno == 1452: info("Database Error", "Invalid Coach, Driver, or Destination ID.")
                 else: info("Database Error", f"Failed to add Trip: {err.msg}")
             except Exception as e:
@@ -1557,16 +1634,16 @@ def open_remove_coach_window(parent_window):
             try:
                 cursor.execute("SELECT COUNT(*) as trip_count FROM trips WHERE CoachID = %s", (coach_id,))
                 if cursor.fetchone()['trip_count'] > 0:
-                    if not app.yesno("Warning", "Coach used in trips. Continue deletion?"): return
+                    if not app.yesno("Warning", "This coach is assigned to trips. Deleting it may cause issues.\nContinue deletion?"): return
 
                 cursor.execute("DELETE FROM coaches WHERE CoachID = %s", (coach_id,))
                 conn.commit()
                 if cursor.rowcount > 0: info("Success", f"Coach removed:\n{selected_coach_text}")
-                else: info("Error", "Coach could not be removed.")
+                else: info("Error", "Coach could not be removed (might already be deleted).")
                 # Use go_back to destroy current and show parent
                 go_back(remove_coach_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                if err.errno == 1451: info("Database Error", "Cannot delete: Coach referenced by trips.")
+                if err.errno == 1451: info("Database Error", "Cannot delete coach: It is referenced by existing trips.")
                 else: info("Database Error", f"Failed to remove coach: {err.msg}")
 
         button_box = Box(remove_coach_win, layout="grid", width="fill", align="bottom")
@@ -1631,17 +1708,17 @@ def open_remove_customer_window(parent_window):
             try:
                 cursor.execute("SELECT COUNT(*) as booking_count FROM bookings WHERE CustomerID = %s", (customer_id,))
                 if cursor.fetchone()['booking_count'] > 0:
-                     if not app.yesno("Warning", "Customer has bookings. Deleting will remove them. Continue?"): return
-                     # cursor.execute("DELETE FROM bookings WHERE CustomerID = %s", (customer_id,)) # Uncomment if ON DELETE CASCADE not set
+                     if not app.yesno("Warning", "This customer has bookings. Deleting the customer will also delete their bookings.\nContinue?"): return
+                     # cursor.execute("DELETE FROM bookings WHERE CustomerID = %s", (customer_id,)) # Uncomment if ON DELETE CASCADE not set in DB
 
                 cursor.execute("DELETE FROM customers WHERE CustomerID = %s", (customer_id,))
                 conn.commit()
                 if cursor.rowcount > 0: info("Success", f"Customer removed:\n{selected_customer_text}")
-                else: info("Error", "Customer could not be removed.")
+                else: info("Error", "Customer could not be removed (might already be deleted).")
                 # Use go_back to destroy current and show parent
                 go_back(remove_customer_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                if err.errno == 1451: info("Database Error", "Cannot delete customer due to related bookings.")
+                if err.errno == 1451: info("Database Error", "Cannot delete customer due to related bookings (foreign key constraint).")
                 else: info("Database Error", f"Failed to remove customer: {err.msg}")
 
         button_box = Box(remove_customer_win, layout="grid", width="fill", align="bottom")
@@ -1706,16 +1783,16 @@ def open_remove_destination_window(parent_window):
             try:
                 cursor.execute("SELECT COUNT(*) as trip_count FROM trips WHERE DestinationID = %s", (destination_id,))
                 if cursor.fetchone()['trip_count'] > 0:
-                    if not app.yesno("Warning", "Destination used in trips. Continue deletion?"): return
+                    if not app.yesno("Warning", "This destination is used in trips. Deleting it may cause issues.\nContinue deletion?"): return
 
                 cursor.execute("DELETE FROM destinations WHERE DestinationID = %s", (destination_id,))
                 conn.commit()
                 if cursor.rowcount > 0: info("Success", f"Destination removed:\n{selected_destination_text}")
-                else: info("Error", "Destination could not be removed.")
+                else: info("Error", "Destination could not be removed (might already be deleted).")
                 # Use go_back to destroy current and show parent
                 go_back(remove_destination_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                if err.errno == 1451: info("Database Error", "Cannot delete: Destination referenced by trips.")
+                if err.errno == 1451: info("Database Error", "Cannot delete destination: It is referenced by existing trips.")
                 else: info("Database Error", f"Failed to remove destination: {err.msg}")
 
         button_box = Box(remove_destination_win, layout="grid", width="fill", align="bottom")
@@ -1779,16 +1856,16 @@ def open_remove_driver_window(parent_window):
             try:
                 cursor.execute("SELECT COUNT(*) as trip_count FROM trips WHERE DriverID = %s", (driver_id,))
                 if cursor.fetchone()['trip_count'] > 0:
-                     if not app.yesno("Warning", "Driver assigned to trips. Continue deletion?"): return
+                     if not app.yesno("Warning", "This driver is assigned to trips. Deleting them may cause issues.\nContinue deletion?"): return
 
                 cursor.execute("DELETE FROM drivers WHERE DriverID = %s", (driver_id,))
                 conn.commit()
                 if cursor.rowcount > 0: info("Success", f"Driver removed:\n{selected_driver_text}")
-                else: info("Error", "Driver could not be removed.")
+                else: info("Error", "Driver could not be removed (might already be deleted).")
                 # Use go_back to destroy current and show parent
                 go_back(remove_driver_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                 if err.errno == 1451: info("Database Error", "Cannot delete: Driver referenced by trips.")
+                 if err.errno == 1451: info("Database Error", "Cannot delete driver: They are referenced by existing trips.")
                  else: info("Database Error", f"Failed to remove driver: {err.msg}")
 
         button_box = Box(remove_driver_win, layout="grid", width="fill", align="bottom")
@@ -1858,17 +1935,17 @@ def open_remove_trip_window(parent_window):
             try:
                 cursor.execute("SELECT COUNT(*) as booking_count FROM bookings WHERE TripID = %s", (trip_id,))
                 if cursor.fetchone()['booking_count'] > 0:
-                    if not app.yesno("Warning", "Trip has bookings. Deleting will remove them. Continue?"): return
-                    # cursor.execute("DELETE FROM bookings WHERE TripID = %s", (trip_id,)) # Uncomment if ON DELETE CASCADE not set
+                    if not app.yesno("Warning", "This trip has bookings. Deleting the trip will also delete its bookings.\nContinue?"): return
+                    # cursor.execute("DELETE FROM bookings WHERE TripID = %s", (trip_id,)) # Uncomment if ON DELETE CASCADE not set in DB
 
                 cursor.execute("DELETE FROM trips WHERE TripID = %s", (trip_id,))
                 conn.commit()
                 if cursor.rowcount > 0: info("Success", f"Trip removed:\n{selected_trip_text}")
-                else: info("Error", "Trip could not be removed.")
+                else: info("Error", "Trip could not be removed (might already be deleted).")
                 # Use go_back to destroy current and show parent
                 go_back(remove_trip_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                if err.errno == 1451: info("Database Error", "Cannot delete trip due to related bookings.")
+                if err.errno == 1451: info("Database Error", "Cannot delete trip due to related bookings (foreign key constraint).")
                 else: info("Database Error", f"Failed to remove trip: {err.msg}")
 
         button_box = Box(remove_trip_win, layout="grid", width="fill", align="bottom")
