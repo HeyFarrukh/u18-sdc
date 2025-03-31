@@ -3,3 +3,6 @@ No More ID's need to be input for removing any data, instead drop down can be ut
 Passengers can no longer Book On trips in the past
 Data is presented in tabular form
 Shows Remaining Seats
+Detailed & Specific error messages so if a certain field is empty then alerts user to fill it
+Queries limited to admin only
+When user views data like for Bookings, they can search by columns.
