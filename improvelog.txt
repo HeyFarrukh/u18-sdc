@@ -7,3 +7,10 @@ Detailed & Specific error messages so if a certain field is empty then alerts us
 Queries limited to admin only
 When user views data like for Bookings, they can search by columns.
 Notification for when no available future trips
+
+
+PREOPTIMISED
+*Remove Search-by-Column Functionality:**
+**Remove "No Future Trips" Alert:**
+**Remove Remaining Seats Display in Add Booking:**
+**Generalise Missing Field Error Messages**
