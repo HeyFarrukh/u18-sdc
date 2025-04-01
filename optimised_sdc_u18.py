@@ -28,20 +28,27 @@ try:
         database=DB_NAME
     )
     # Use dictionary=True for easier data access by column name
+    # Using dictionary=True allows accessing results by column name (e.g., row['FirstName'])
+    # instead of by index (e.g., row[0]), improving code readability.
     cursor = conn.cursor(dictionary=True)
 except mysql.connector.Error as err:
     # Graceful exit if DB connection fails
+    # Gracefully handles database connection errors during startup.
     try:
         # Attempt to show a Guizero popup before exiting
-        temp_app = App(title="DB Connection Error", visible=False) # Create hidden temp app
+        # Attempts to show a user-friendly error message using a temporary Guizero window.
+        temp_app = App(title="DB Connection Error", visible=False) # Create hidden temp app # Creates a hidden temporary app instance.
         info("Database Connection Error", f"Failed to connect to database: {err}")
-        temp_app.destroy() # Close the temp app
+        temp_app.destroy() # Close the temp app # Closes the temporary app window.
     except Exception:
         # Fallback to console if GUI fails
+        # If the GUI fails (e.g., display not available), fallback to printing the error to the console.
         print(f"CRITICAL DATABASE ERROR: {err}")
+    # Exits the script immediately as the application cannot function without a database connection.
     exit() # Stop the script
 
 # --- Pagination Globals ---
+# Variables to manage the display of large datasets in tables across multiple pages.
 current_page = 0 # General current page for main table views
 records_per_page = 15 # How many records to show per page in main table views
 query_records_per_page = 10 # Specific pagination for query results
@@ -51,6 +58,8 @@ query_records_per_page = 10 # Specific pagination for query results
 def clear_box(box):
     """Removes all widgets from a given Box."""
     # Iterate over a copy of the children list because destroying modifies the list
+    # Creates a copy of the children list because destroying a widget modifies the original list
+    # while iterating over it, which can lead to skipped widgets or errors.
     widgets_to_destroy = box.children[:]
     for widget in widgets_to_destroy:
         widget.destroy()
@@ -95,7 +104,17 @@ def create_search_box(parent_box, table_name, table_view_box, pagination_box):
 
 
 def fetch_and_display_table(table_name, table_box, pagination_box, page=0, search_term=None, search_field=None):
-    """Fetches data based on table name, search criteria, and page, then displays it."""
+    """
+    Fetches data based on table name, search criteria, and page, then displays it.
+    Fetches data for a specified table and page, then displays it in a grid layout
+    within the provided `table_box`. Also sets up pagination controls in `pagination_box`.
+
+    Args:
+        table_name (str): The name of the database table to fetch data from (e.g., "bookings", "customers").
+        table_box (Box): The Guizero Box widget where the data grid will be displayed.
+        pagination_box (Box): The Guizero Box widget where pagination buttons will be placed.
+        page (int): The page number to fetch (0-indexed).
+    """
     global current_page
     current_page = page
     offset = page * records_per_page
@@ -107,14 +126,16 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
     query_params = [] # Parameters for the SQL query to prevent injection
 
     try:
-        # Prepare search value for LIKE, unless it's handled as an exact match later
         search_value = None
         if search_term and search_field:
-            search_value = f"%{search_term}%" # Wildcards for LIKE
+            search_value = f"%{search_term}%" 
 
         # --- Configure Query, Columns, and Search Logic for Each Table ---
-
+        # --- Dynamically configure Query and Columns based on the requested table_name ---
+        # Uses LEFT JOINs to ensure records are shown even if related data is missing.
         if table_name == "bookings":
+            # Fetch booking details along with customer name, destination, and trip date.
+            # Format cost as currency.
             select_query = """
                 SELECT b.BookingID, b.CustomerID, CONCAT(c.FirstName, ' ', c.Surname) as CustomerName,
                        b.TripID, d.DestinationName, t.Date as TripDate,
@@ -148,6 +169,7 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
                     query_params.append(search_value)
 
         elif table_name == "trips":
+            # Fetch trip details along with destination name, driver name, and coach registration.
             select_query = """
                 SELECT t.TripID, d.DestinationName, dr.DriverName, c.Registration as CoachReg, t.Date
             """
@@ -247,6 +269,10 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
             Text(table_box, text=f"Table '{table_name}' display not configured.", color="red")
             return
 
+        # --- Data Key Mapping ---
+        # Maps the display column headers 
+        # keys/aliases used in the SELECT query result dictionary 
+        # Necessary because some display headers differ from the database column names or aliases.
         data_key_map = {}
         if table_name == "bookings": data_key_map = {"ID": "BookingID", "Cust. ID": "CustomerID", "Customer Name": "CustomerName", "Trip ID": "TripID", "Destination": "DestinationName", "Trip Date": "TripDate", "# People": "NumberofPeople", "Cost": "Cost", "Request": "SpecialRequest", "Booking Date": "BookingDate"}
         elif table_name == "trips": data_key_map = {"ID": "TripID", "Destination": "DestinationName", "Driver Name": "DriverName", "Coach Reg": "CoachReg", "Date": "Date"}
@@ -255,14 +281,17 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
         elif table_name == "destinations": data_key_map = {"ID": "DestinationID", "Name": "DestinationName", "Hotel": "Hotel", "Cost": "DestinationCost", "City": "CityName", "Days": "Days"}
         elif table_name == "drivers": data_key_map = {"ID": "DriverID", "Driver Name": "DriverName"}
 
+        # Fetch total record count for pagination
         count_query = f"SELECT COUNT(*) as total {base_query}{where_clause}"
         cursor.execute(count_query, tuple(query_params))
         total_records = cursor.fetchone()['total']
 
+        # Fetch records for the current page using LIMIT and OFFSET
         data_query = f"{select_query} {base_query}{where_clause} LIMIT %s OFFSET %s"
         limit_params = query_params + [records_per_page, offset]
         cursor.execute(data_query, tuple(limit_params))
         records = cursor.fetchall()
+        # Calculate total pages needed (ceiling division)
         total_pages = (total_records + records_per_page - 1) // records_per_page
 
         clear_box(table_box)
@@ -270,51 +299,61 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
 
         if records or columns:
             table_grid = Box(table_box, layout="grid", width="fill", align="top")
+            # Create header row
             for col, header in enumerate(columns):
                 Text(table_grid, text=header, grid=[col, 0], color=TEXT_COLOR, size=11, font="Arial", bold=True)
+            # Populate data rows
             for row, record_dict in enumerate(records, start=1):
                 for col, header in enumerate(columns):
-                    data_key = data_key_map.get(header, header)
-                    raw_value = record_dict.get(data_key, '')
+                    data_key = data_key_map.get(header, header) # Get DB key for this header
+                    raw_value = record_dict.get(data_key, '') # Get value from record dict
+                    # Format data for display based on type
                     if isinstance(raw_value, datetime.date):
-                        data_to_display = raw_value.strftime('%Y-%m-%d')
-                    elif isinstance(raw_value, (int, float)):
-                         data_to_display = str(raw_value)
+                        data_to_display = raw_value.strftime('%Y-%m-%d') # Format dates
+                    elif isinstance(raw_value, (int, float)): # Format numbers (already formatted in query for cost)
+                         data_to_display = str(raw_value) # Convert numbers
                     elif raw_value is None:
-                        data_to_display = ""
+                        data_to_display = "" # Handle NULLs
                     else:
-                        data_to_display = str(raw_value)
-                    Text(table_grid, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10)
+                        data_to_display = str(raw_value) # Convert others
+                    Text(table_grid, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10) # Display data
         elif not columns: Text(table_box, text="Columns not defined.", color="red")
         else: Text(table_box, text="No records found.", color=TEXT_COLOR)
 
+        # Create Pagination Controls
         pagination_controls = Box(pagination_box, layout="grid", width="fill", align="bottom")
         if page > 0:
             prev_button = PushButton(pagination_controls, text="<< Previous",
+                                     # Lambda captures current page `p` and calls fetch for previous page (p-1)
                                      command=lambda p=page, st=search_term, sf=search_field: fetch_and_display_table(table_name, table_box, pagination_box, p - 1, st, sf),
                                      grid=[0, 0], align="left")
             prev_button.bg = BUTTON_BG_COLOR; prev_button.text_color = BUTTON_TEXT_COLOR
         Text(pagination_controls, text=f"Page {page + 1} of {max(1, total_pages)}", grid=[1, 0], align="left", color=TEXT_COLOR)
         if page < total_pages - 1:
             next_button = PushButton(pagination_controls, text="Next >>",
+                                     # Lambda calls fetch for next page (p+1)
                                      command=lambda p=page, st=search_term, sf=search_field: fetch_and_display_table(table_name, table_box, pagination_box, p + 1, st, sf),
                                      grid=[2, 0], align="left")
             next_button.bg = BUTTON_BG_COLOR; next_button.text_color = BUTTON_TEXT_COLOR
 
     except mysql.connector.Error as err:
+        # Handle database errors during fetch/count
         clear_box(table_box); clear_box(pagination_box)
         Text(table_box, text=f"Database Error:\n{err}", color="red", size=12)
-        print(f"DB Error in fetch_and_display: {err}")
+        print(f"DB Error in fetch_and_display for table '{table_name}': {err}")
     except Exception as e:
+        # Handle other unexpected errors
         clear_box(table_box); clear_box(pagination_box)
-        Text(table_box, text=f"Error:\n{e}", color="red", size=12)
+        Text(table_box, text=f"An unexpected error occurred:\n{e}", color="red", size=12)
         import traceback; traceback.print_exc()
 
 
 # --- GUI Functions ---
 def go_back(current_window, previous_window):
     """Hides the current window and shows the previous one (or the main app)."""
-    current_window.destroy() # Use destroy instead of hide for add/remove/query windows
+    # Destroys the current window to free resources. If no previous window is specified,
+    # shows the main application window (`app`).
+    current_window.destroy()
     if previous_window:
         previous_window.show()
     else:
@@ -331,7 +370,7 @@ def go_back_to_staff_main_from_bookings(): go_back(staff_bookings_window, staff_
 def go_back_to_staff_main_from_destinations(): go_back(staff_destinations_window, staff_window)
 def go_back_to_staff_main_from_trips(): go_back(staff_trips_window, staff_window)
 
-# --- Back Functions for Data Windows (Generic -> Specific Menu) ---
+# --- Back Functions for Data Windows (Navigating from Data View -> Specific Menu) ---
 def go_back_to_staff_bookings_menu_from_data(window_to_hide): go_back(window_to_hide, staff_bookings_window)
 def go_back_to_admin_customers_menu_from_data(window_to_hide): go_back(window_to_hide, customers_window)
 def go_back_to_staff_customers_menu_from_data(window_to_hide): go_back(window_to_hide, staff_customers_window)
@@ -340,11 +379,14 @@ def go_back_to_admin_destinations_menu_from_data(window_to_hide): go_back(window
 def go_back_to_staff_destinations_menu_from_data(window_to_hide): go_back(window_to_hide, staff_destinations_window)
 def go_back_to_admin_drivers_menu_from_data(window_to_hide): go_back(window_to_hide, drivers_window)
 def go_back_to_staff_trips_menu_from_data(window_to_hide): go_back(window_to_hide, staff_trips_window)
+
+# Back function specifically for logging out (returns to main app screen)
 def go_back_to_main_menu(window_to_hide): go_back(window_to_hide, app) # Generic back to main app screen
 
-# --- Data Fetching Functions (Original versions from your code) ---
+# --- Data Fetching Functions (Fetch All - Used for Populating Combos etc.) ---
 def get_all_bookings():
     """Fetches all bookings from the database."""
+    """Fetches ALL booking records, joining customer name."""
     try:
         cursor.execute("""
             SELECT b.*, CONCAT(c.FirstName, ' ', c.Surname) as CustomerName
@@ -355,10 +397,11 @@ def get_all_bookings():
         return bookings
     except mysql.connector.Error as err:
         info("Database Error", f"Error fetching bookings: {err}")
-        return None
+        return None # Indicatesfailure
 
 def get_all_customers():
     """Fetches all customers from the database, ordered by CustomerID."""
+    """Fetches ALL customer records, ordered by CustomerID."""
     try:
         cursor.execute("SELECT * FROM customers ORDER BY CustomerID ASC")
         customers = cursor.fetchall()
@@ -369,6 +412,7 @@ def get_all_customers():
 
 def get_all_coaches():
     """Fetches all coaches from the database."""
+    """Fetches ALL coach records."""
     try:
         cursor.execute("SELECT * FROM coaches")
         coaches = cursor.fetchall()
@@ -379,6 +423,7 @@ def get_all_coaches():
 
 def get_all_destinations():
     """Fetches all destinations from the database"""
+    """Fetches ALL destination records."""
     try:
         cursor.execute("SELECT * FROM destinations")
         destinations = cursor.fetchall()
@@ -389,6 +434,7 @@ def get_all_destinations():
 
 def get_all_drivers():
     """Fetches all drivers from the database."""
+    """Fetches ALL driver records."""
     try:
         cursor.execute("SELECT * FROM drivers")
         drivers = cursor.fetchall()
@@ -399,6 +445,7 @@ def get_all_drivers():
 
 def get_all_trips():
     """Fetches all the trips from the database"""
+    """Fetches ALL trip records, joining destination name."""
     try:
         cursor.execute("""
             SELECT t.*, d.DestinationName
@@ -427,8 +474,10 @@ def open_bookings_data_window(parent_window, back_function_to_call):
     create_search_box(search_area_box, "bookings", table_view_box, pagination_box)
     fetch_and_display_table("bookings", table_view_box, pagination_box, page=0)
 
+    # Adds back button using the specific back function passed in, ensuring correct navigation flow.
     if back_function_to_call:
         # Pass the bookings_data_win to be destroyed by go_back
+        # Lambda calls the provided back function, passing the window to be closed.
         back_button = PushButton(back_button_box, text="Back to Menu",
                                  command=lambda: back_function_to_call(bookings_data_win), align="right")
         back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
@@ -624,6 +673,7 @@ def open_drivers_window():
 
 def open_admin_main_window():
     global admin_login_window
+    # Attempt to hide the login window if it exists and is visible.
     try:
         if admin_login_window and admin_login_window.visible:
              admin_login_window.hide()
@@ -640,7 +690,7 @@ def open_admin_main_window():
     drivers_button = PushButton(button_box, text="DRIVERS", width=15, command=open_drivers_window)
     # Pass admin_main_window as the parent to return to
     search_button = PushButton(button_box, text="QUERIES", width=15,
-                               command=lambda: open_query_window(admin_main_window)) # MODIFIED
+                               command=lambda: open_query_window(admin_main_window)) 
     back_button = PushButton(button_box, text="Logout", width=15, command=lambda: go_back_to_main_menu(admin_main_window))
 
     customers_button.bg = BUTTON_BG_COLOR; customers_button.text_color = BUTTON_TEXT_COLOR
@@ -657,7 +707,6 @@ def open_admin_main_window():
 
 #region Staff Windows
 # --- Staff Window Functions ---
-# --- MODIFIED CALLS to pass parent window ---
 def open_staff_customers_window():
     staff_window.hide()
     global staff_customers_window
@@ -747,16 +796,12 @@ def open_staff_window():
     bookings_button = PushButton(button_box, text="BOOKINGS", width=15, command=open_staff_bookings_window)
     destinations_button = PushButton(button_box, text="DESTINATIONS", width=15, command=open_staff_destinations_window)
     trips_button = PushButton(button_box, text="TRIPS", width=15, command=open_staff_trips_window)
-    # Removed the Queries button for staff
-    # search_button = PushButton(button_box, text="QUERIES", width=15,
-    #                            command=lambda: open_query_window(staff_window)) # MODIFIED
     back_button = PushButton(button_box, text="Logout", width=15, command=lambda: go_back_to_main_menu(staff_window))
 
     customers_button.bg = BUTTON_BG_COLOR; customers_button.text_color = BUTTON_TEXT_COLOR
     bookings_button.bg = BUTTON_BG_COLOR; bookings_button.text_color = BUTTON_TEXT_COLOR
     destinations_button.bg = BUTTON_BG_COLOR; destinations_button.text_color = BUTTON_TEXT_COLOR
     trips_button.bg = BUTTON_BG_COLOR; trips_button.text_color = BUTTON_TEXT_COLOR
-    # search_button.bg = BUTTON_BG_COLOR; search_button.text_color = BUTTON_TEXT_COLOR # No longer exists for staff
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
     staff_window.show()
 
@@ -764,7 +809,6 @@ def open_staff_window():
 
 
 #region Add Windows
-# --- MODIFIED FUNCTIONS: Add parent_window argument and use it for Back button ---
 
 # Modified: Added parent_window parameter
 def open_add_customer_window(parent_window):
@@ -783,6 +827,10 @@ def open_add_customer_window(parent_window):
     notes_entry = None
     add_button = None
     back_button = None
+
+    # Define required fields and error message for validation feedback.
+    CUSTOMER_REQUIRED_FIELDS = ("First Name", "Surname", "Email", "Address Line 1", "City", "Postcode", "Phone Number")
+    STATIC_ERROR_MESSAGE = f"Please ensure all required fields are entered correctly: [{', '.join(CUSTOMER_REQUIRED_FIELDS)}]"
 
     try:
         add_customer_win = Window(app, title="Add Customer", width=450, height=600, bg=BG_COLOR) # Use app as master
@@ -844,40 +892,28 @@ def open_add_customer_window(parent_window):
                 notes = notes_entry.value.strip()
 
                 # --- Improved Validation ---
-                if not first_name:
-                    info("Input Error", "First Name is required.")
-                    return
-                if not surname:
-                    info("Input Error", "Surname is required.")
-                    return
-                if not email:
-                    info("Input Error", "Email is required.")
-                    return
-                email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-                if not re.match(email_regex, email):
-                    info("Input Error", "Invalid email format.")
-                    return
-                if not address1:
-                    info("Input Error", "Address Line 1 is required.")
-                    return
-                if not city:
-                    info("Input Error", "City is required.")
-                    return
-                if not postcode:
-                    info("Input Error", "Postcode is required.")
-                    return
-                if not phone:
-                    info("Input Error", "Phone Number is required.")
+                # --- Input Validation ---
+                is_missing = not first_name or not surname or not email or not address1 or not city or not postcode or not phone
+                email_valid = True
+                if email:
+                    # Basic email format validation using regex.
+                    email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                    if not re.match(email_regex, email):
+                        email_valid = False
+
+                if is_missing or not email_valid:
+                    info("Input Error", STATIC_ERROR_MESSAGE + ("\nInvalid email format." if not email_valid and email else ""))
                     return
                 # --- End Improved Validation ---
 
 
+                # --- Database Insertion ---
                 cursor.execute("""
                     INSERT INTO customers (FirstName, Surname, Email, AddressLine1,
                                            AddressLine2, City, Postcode, PhoneNumber, SpecialNotes)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (first_name, surname, email, address1,
-                      address2 or None, city, postcode, phone, notes or None))
+                      address2 or None, city, postcode, phone, notes or None)) # Use None for optional fields if empty
                 conn.commit()
                 info("Success", "Customer added successfully.")
                 # Use go_back to destroy current and show parent
@@ -886,8 +922,9 @@ def open_add_customer_window(parent_window):
                 conn.rollback()
                 print(f"Database error adding customer: {err}")
                 # More specific DB errors
+                # Provide specific feedback for duplicate entry errors (e.g., unique email constraint).
                 if err.errno == errorcode.ER_DUP_ENTRY:
-                     info("Database Error", f"Failed to add customer.\nPossible duplicate entry: {err.msg}")
+                     info("Database Error", f"Failed to add customer.\nPossible duplicate entry (e.g., email): {err.msg}")
                 else:
                      info("Database Error", f"Failed to add customer.\nError: {err.msg}")
             except Exception as e:
@@ -924,12 +961,15 @@ def open_add_booking_window(parent_window):
     available_seats_text_widget = None
     num_people_entry_widget = None # Re-added
     special_request_entry_widget = None
-    booking_date_entry_widget = None
+    booking_date_entry_widget = None # Displays trip date, not for input
     add_button = None
     back_button = None
 
     # Store current available seats for validation
     current_available_seats = 0
+
+    BOOKING_REQUIRED_FIELDS = ("Customer", "Trip", "Number of People")
+    STATIC_BOOKING_ERROR_MESSAGE = f"Please ensure all required fields are selected/entered correctly: [{', '.join(BOOKING_REQUIRED_FIELDS)}]"
 
     try:
         # Reverted size and resizable property
@@ -965,18 +1005,22 @@ def open_add_booking_window(parent_window):
         special_request_entry_widget = TextBox(form_box, width=25, grid=[1, 6], align="left", multiline=True, height=3)
 
         # Row 6 (now 7): Booking Date Label and Entry
-        Text(form_box, text="Booking Date:", color=TEXT_COLOR, grid=[0, 7], align="left")
-        booking_date_entry_widget = TextBox(form_box, width=15, grid=[1, 7], align="left", enabled=False)
+        Text(form_box, text="Booking Date:", color=TEXT_COLOR, grid=[0, 7], align="left") # Label changed for clarity
+        # Text(form_box, text="Trip Date:", color=TEXT_COLOR, grid=[0, 6], align="left") # Original label
+        booking_date_entry_widget = TextBox(form_box, width=15, grid=[1, 7], align="left", enabled=False) # Disabled for user input.
 
         # --- Reverted: Function to update trip details (simpler) ---
+        # --- Function to Update Details When Trip Changes ---
         def update_trip_details():
-            nonlocal current_available_seats # Allow modification of the outer scope variable
+            """Called when trip combo changes. Updates date display & checks seat availability."""
+            nonlocal current_available_seats # Allow modification of the outer scope variable # Modify the outer scope variable.
             selected_trip_str = trip_combo_widget.value
             trip_date = None
             trip_id = None
-            current_available_seats = 0 # Reset
+            current_available_seats = 0 
 
             # Try to extract ID and date
+            # Extract TripID and Date from the combo string (e.g., "123: 2024-12-25 - London")
             match_id = re.match(r"^(\d+):.*", selected_trip_str)
             match_date = re.match(r"^\d+: (\d{4}-\d{2}-\d{2}) - .+$", selected_trip_str)
 
@@ -985,25 +1029,24 @@ def open_add_booking_window(parent_window):
             if match_date:
                 trip_date = match_date.group(1)
 
-            if trip_date:
-                booking_date_entry_widget.value = trip_date
-                booking_date_entry_widget.enabled = False
-            else:
-                booking_date_entry_widget.value = ""
-                booking_date_entry_widget.enabled = False
+            booking_date_entry_widget.value = trip_date if trip_date else ""
+            booking_date_entry_widget.enabled = False # Ensure stays disabled
 
             # Fetch and display available seats if a valid trip ID is found
+            # If a valid trip ID extracted, query database for seat capacity.
             if trip_id:
                 try:
                     # Get Total Seats
+                    # Get total seats for the coach on this trip.
                     cursor.execute("SELECT c.Seats FROM trips t JOIN coaches c ON t.CoachID = c.CoachID WHERE t.TripID = %s", (trip_id,))
                     seat_result = cursor.fetchone()
                     total_seats = seat_result['Seats'] if seat_result else 0
 
                     # Get Booked Seats
+                    # Get sum of people already booked.
                     cursor.execute("SELECT SUM(NumberofPeople) as booked FROM bookings WHERE TripID = %s", (trip_id,))
                     booked_result = cursor.fetchone()
-                    booked_seats = booked_result['booked'] or 0
+                    booked_seats = booked_result['booked'] or 0 # Use 0 if SUM is NULL.
 
                     current_available_seats = total_seats - booked_seats
                     available_seats_text_widget.value = f"Seats Available: {current_available_seats}"
@@ -1017,12 +1060,13 @@ def open_add_booking_window(parent_window):
             else:
                 # If no valid trip selected (e.g., blank option), clear info
                 available_seats_text_widget.value = "Seats Available: -"
-                current_available_seats = 0
+                current_available_seats = 0 # No trip selected or invalid format.
 
         # Assign the update function to the trip combo command
+        # Assign the update function to the trip combo box's command.
         trip_combo_widget.update_command(update_trip_details)
 
-        # Populate Customer Combo
+        # --- Populate Customer Combo Box ---
         try:
             customers_data = get_all_customers() # This function now returns ordered data
             customer_combo_widget.clear()
@@ -1038,13 +1082,13 @@ def open_add_booking_window(parent_window):
             customer_combo_widget.append("Error loading customers")
             customer_combo_widget.disable()
         except Exception as e: # Catch other potential errors during customer load
-            info("Error", f"Unexpected error loading customers: {e}")
-            customer_combo_widget.append("Error loading customers")
-            customer_combo_widget.disable()
+            info("Error", f"Unexpected error loading customers: {e}"); customer_combo_widget.append("Error"); customer_combo_widget.disable()
 
 
+        # --- Populate Trip Combo Box (Only Future Trips) ---
         # Populate Trip Combo and handle "No Trips" message
         try:
+            # Fetch trips on or after today's date.
             cursor.execute("""
                 SELECT t.TripID, t.Date, d.DestinationName
                 FROM trips t JOIN destinations d ON t.DestinationID = d.DestinationID
@@ -1061,8 +1105,7 @@ def open_add_booking_window(parent_window):
                 num_people_entry_widget.enabled = True # Ensure enabled
             else:
                  #trip_combo_widget.append("No upcoming trips available") # Optional: keep this in combo
-                 trip_combo_widget.disable()
-                 num_people_entry_widget.disable() # Disable number entry if no trips
+                 trip_combo_widget.disable(); num_people_entry_widget.disable() # Disable number entry if no trips
                  no_trips_message.value = "No future trips available." # Set message text
                  no_trips_message.visible = True # Show the message
                  available_seats_text_widget.value = "Seats Available: -" # Clear seat info
@@ -1070,65 +1113,68 @@ def open_add_booking_window(parent_window):
         except mysql.connector.Error as err:
             info("Database Error", f"Could not load trips: {err}")
             trip_combo_widget.append("Error loading trips")
-            trip_combo_widget.disable()
-            num_people_entry_widget.disable()
+            trip_combo_widget.disable(); num_people_entry_widget.disable()
             no_trips_message.value = "Error loading trips."
             no_trips_message.visible = True
             available_seats_text_widget.value = "Seats Available: -"
         except Exception as e: # Catch other potential errors during trip load
-            info("Error", f"Unexpected error loading trips: {e}")
-            trip_combo_widget.append("Error loading trips")
-            trip_combo_widget.disable()
-            num_people_entry_widget.disable()
-            no_trips_message.value = "Error loading trips."
-            no_trips_message.visible = True
-            available_seats_text_widget.value = "Seats Available: -"
+            info("Error", f"Unexpected error loading trips: {e}"); trip_combo_widget.append("Error"); trip_combo_widget.disable(); num_people_entry_widget.disable()
 
         # --- Reverted: Inner function to handle adding the booking ---
+        # --- Inner Function to Add the Booking ---
         def add_booking():
             # Use the 'current_available_seats' calculated when trip was selected
-            nonlocal current_available_seats
+            nonlocal current_available_seats # Access seat count from outer scope
             calculated_cost = 0
             selected_customer = customer_combo_widget.value
             selected_trip = trip_combo_widget.value
             num_people_str = num_people_entry_widget.value.strip() # Read from TextBox
             special_request = special_request_entry_widget.value.strip()
-            booking_date_str = booking_date_entry_widget.value # Get automatically set value
+            booking_date_str = booking_date_entry_widget.value # Get automatically set value # Trip date (read-only)
 
             try:
-                # --- Input Validation (Improved) ---
-                if not selected_customer or ":" not in selected_customer:
-                     info("Input Error", "Please select a Customer.")
-                     return
+                # --- Input Validation ---
+                is_invalid = False
+                num_people = 0
+
+                if not selected_customer or ":" not in selected_customer: is_invalid = True
                 # Check if combo disabled OR no trip selected
-                if trip_combo_widget.enabled == False or not selected_trip or ":" not in selected_trip:
-                    info("Input Error", "Please select a valid Trip.")
-                    return
-                if not num_people_str:
-                    info("Input Error", "Number of People is required.")
-                    return
-                if not num_people_str.isdigit() or int(num_people_str) <= 0:
-                    info("Input Error", "Number of People must be a positive whole number.")
-                    return
+                if trip_combo_widget.enabled == False or not selected_trip or ":" not in selected_trip: is_invalid = True
+                if not num_people_str: is_invalid = True
+
+                if num_people_str:
+                    # Validate number of people format (positive integer).
+                    if not num_people_str.isdigit() or int(num_people_str) <= 0:
+                        is_invalid = True
+                    else:
+                        num_people = int(num_people_str)
+
+                if not booking_date_str: is_invalid = True
+                else:
+                    # Validate trip date format again (should be set by trip selection).
+                    try: datetime.datetime.strptime(booking_date_str, "%Y-%m-%d").date()
+                    except ValueError: is_invalid = True
+
+                if is_invalid:
+                     info("Input Error", STATIC_BOOKING_ERROR_MESSAGE)
+                     return
 
                 customer_id = int(selected_customer.split(":")[0])
                 trip_id = int(selected_trip.split(":")[0]) # Get trip_id from selection
-                num_people = int(num_people_str)
 
                 # --- Check Capacity AGAIN (as a final confirmation) ---
+                # --- Re-check Seat Availability (Crucial Check Before Insert) ---
                 # Fetch current available seats just before booking to be absolutely sure
                 try:
                     cursor.execute("SELECT c.Seats FROM trips t JOIN coaches c ON t.CoachID = c.CoachID WHERE t.TripID = %s", (trip_id,))
-                    seat_result = cursor.fetchone()
-                    total_seats = seat_result['Seats'] if seat_result else 0
+                    seat_result = cursor.fetchone(); total_seats = seat_result['Seats'] if seat_result else 0
                     cursor.execute("SELECT SUM(NumberofPeople) as booked FROM bookings WHERE TripID = %s", (trip_id,))
-                    booked_result = cursor.fetchone()
-                    booked_seats = booked_result['booked'] or 0
+                    booked_result = cursor.fetchone(); booked_seats = booked_result['booked'] or 0
                     final_available_seats = total_seats - booked_seats
-                except mysql.connector.Error:
-                    info("Database Error", "Could not re-verify seat capacity before booking.")
-                    return
+                except mysql.connector.Error as db_err:
+                    info("Database Error", f"Could not re-verify seat capacity: {db_err}"); return
 
+                # Final check if requested number exceeds available seats.
                 if num_people > final_available_seats:
                     info("Input Error", f"Not enough seats available ({final_available_seats} left). Cannot book {num_people}.")
                     # Refresh the display just in case
@@ -1136,27 +1182,17 @@ def open_add_booking_window(parent_window):
                     current_available_seats = final_available_seats # Update local cache
                     return
 
-                # Validate the automatically populated date field is not empty
-                if not booking_date_str:
-                     info("Input Error", "Booking Date could not be determined. Please re-select Trip.")
-                     return
-                try:
-                    datetime.datetime.strptime(booking_date_str, "%Y-%m-%d").date()
-                except ValueError:
-                    info("Input Error", "Invalid Booking Date format derived from trip. Please re-select trip.")
-                    return
-                # --- End Input Validation ---
-
-
-                # --- Calculate Cost ---
+                # --- Calculate Booking Cost ---
                 cursor.execute("SELECT d.DestinationCost FROM trips t JOIN destinations d ON t.DestinationID = d.DestinationID WHERE t.TripID = %s", (trip_id,))
                 cost_result = cursor.fetchone()
                 if cost_result and cost_result['DestinationCost'] is not None:
                      calculated_cost = float(cost_result['DestinationCost']) * num_people
                 else:
-                    info("Error", "Could not retrieve destination cost."); return
+                    info("Error", f"Could not retrieve destination cost for Trip ID {trip_id}."); return
 
                 # --- Insert Booking ---
+                # --- Database Insertion ---
+                # Inserting trip date into BookingDate column.
                 cursor.execute("""
                 INSERT INTO bookings (CustomerID, TripID, BookingCost, NumberofPeople, SpecialRequest, BookingDate)
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -1169,14 +1205,13 @@ def open_add_booking_window(parent_window):
             except TypeError: info("Error", "Cost calculation error or invalid data.")
             except mysql.connector.Error as err:
                 conn.rollback()
-                # More specific DB errors
+                # Handle foreign key constraint violation (invalid Customer/Trip ID).
                 if err.errno == 1452: # Foreign key constraint fails
-                     info("Database Error", "Invalid Customer or Trip ID selected.")
+                     info("Database Error", "Invalid Customer or Trip ID selected. Please ensure they exist.")
                 else:
-                     info("Database Error",f"Error Adding booking: {err.msg}")
+                     info("Database Error",f"Error adding booking: {err.msg}")
             except Exception as e: # Catch other potential errors
-                info("Error", f"An unexpected error occurred: {e}")
-                import traceback; traceback.print_exc()
+                info("Error", f"An unexpected error occurred: {e}"); import traceback; traceback.print_exc()
 
         # Buttons Box (Separate Box at the bottom)
         button_box = Box(add_booking_win, layout="grid", width="fill", align="bottom")
@@ -1187,6 +1222,7 @@ def open_add_booking_window(parent_window):
         back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
 
         # Call update_trip_details initially to set date and seats if a default trip is selected
+        # Call initially to set date field if a default trip is selected.
         update_trip_details()
         add_booking_win.show()
 
@@ -1206,6 +1242,9 @@ def open_add_coach_window(parent_window):
     seats_entry = None
     add_button = None
     back_button = None
+
+    COACH_REQUIRED_FIELDS = ("Coach Registration", "Number of Seats")
+    STATIC_COACH_ERROR_MESSAGE = f"Please ensure all required fields are entered correctly: [{', '.join(COACH_REQUIRED_FIELDS)}]"
 
     try:
         add_coach_win = Window(app, title = "Add Coach", width = 400, height = 220, bg = BG_COLOR) # Use app as master
@@ -1227,14 +1266,17 @@ def open_add_coach_window(parent_window):
                 seats_str = seats_entry.value.strip()
 
                 # --- Improved Validation ---
-                if not registration:
-                    info("Input Error", "Coach Registration is required.")
-                    return
-                if not seats_str:
-                    info("Input Error", "Number of Seats is required.")
-                    return
-                if not seats_str.isdigit() or int(seats_str) <= 0:
-                    info("Input Error", "Number of seats must be a positive whole number.")
+                is_invalid = False
+                if not registration: is_invalid = True
+                if not seats_str: is_invalid = True
+
+                # Validate seats is a positive integer
+                if seats_str:
+                    if not seats_str.isdigit() or int(seats_str) <= 0:
+                        is_invalid = True
+
+                if is_invalid:
+                    info("Input Error", STATIC_COACH_ERROR_MESSAGE)
                     return
                 # --- End Improved Validation ---
 
@@ -1246,6 +1288,7 @@ def open_add_coach_window(parent_window):
                 go_back(add_coach_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
                 conn.rollback()
+                # Handle potential duplicate registration
                 if err.errno == errorcode.ER_DUP_ENTRY:
                      info("Database Error", "Coach Registration already exists.")
                 else:
@@ -1282,6 +1325,9 @@ def open_add_destination_window(parent_window):
     add_button = None
     back_button = None
 
+    DEST_REQUIRED_FIELDS = ("Destination Name", "Hotel Name", "Destination Cost", "City Name", "Days")
+    STATIC_DEST_ERROR_MESSAGE = f"Please ensure all required fields are entered correctly and are valid numbers (Cost >= 0, Days > 0): [{', '.join(DEST_REQUIRED_FIELDS)}]"
+
     try:
         add_destination_win = Window(app, title = "Add Destination", width = 400, height = 350, bg = BG_COLOR) # Use app as master
         add_destination_win.tk.resizable(False, False)
@@ -1314,43 +1360,43 @@ def open_add_destination_window(parent_window):
                 days_str = days_entry.value.strip()
 
                 # --- Improved Validation ---
-                if not name:
-                    info("Input Error", "Destination Name is required.")
+                is_invalid = False
+                if not name: is_invalid = True
+                if not cost_str: is_invalid = True
+                if not city: is_invalid = True
+                if not days_str: is_invalid = True
+
+                cost = 0.0
+                days = 0
+                # Validate cost is a non-negative number
+                if cost_str:
+                    try:
+                        cost = float(cost_str)
+                        if cost < 0: is_invalid = True
+                    except ValueError: is_invalid = True
+                # Validate days is a positive integer
+                if days_str:
+                    try:
+                        days = int(days_str)
+                        if days <= 0: is_invalid = True
+                    except ValueError: is_invalid = True
+
+                if is_invalid:
+                    info("Input Error", STATIC_DEST_ERROR_MESSAGE)
                     return
-                if not hotel:
-                    info("Input Error", "Hotel Name is required.")
-                    return
-                if not cost_str:
-                     info("Input Error", "Destination Cost is required.")
-                     return
-                try:
-                    cost = float(cost_str)
-                    if cost < 0: raise ValueError("Cost cannot be negative")
-                except ValueError:
-                    info("Input Error", "Cost must be a non-negative number (e.g., 50.00 or 50).")
-                    return
-                if not city:
-                     info("Input Error", "City Name is required.")
-                     return
-                if not days_str:
-                    info("Input Error", "Number of Days is required.")
-                    return
-                if not days_str.isdigit() or int(days_str) <= 0:
-                    info("Input Error", "Days must be a positive whole number.")
-                    return
-                days = int(days_str)
                 # --- End Improved Validation ---
 
                 cursor.execute("""
                 INSERT INTO destinations (DestinationName, Hotel, DestinationCost, CityName, Days)
                 VALUES (%s, %s, %s, %s, %s)""",
-                (name, hotel, cost, city, days))
+                (name, hotel or None, cost, city, days)) # Use hotel or None
                 conn.commit()
                 info("Success", "Destination added successfully.")
                 # Use go_back to destroy current and show parent
                 go_back(add_destination_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
                 conn.rollback()
+                # Handle potential duplicate destination name
                 if err.errno == errorcode.ER_DUP_ENTRY: info("Database Error", "Destination name might already exist.")
                 else: info("Database Error", f"Failed to add Destination: {err.msg}")
             except Exception as e:
@@ -1380,6 +1426,9 @@ def open_add_driver_window(parent_window):
     add_button = None
     back_button = None
 
+    DRIVER_REQUIRED_FIELDS = ("Driver's Full Name",)
+    STATIC_DRIVER_ERROR_MESSAGE = f"Please ensure all required fields are entered correctly: [{', '.join(DRIVER_REQUIRED_FIELDS)}]"
+
     try:
         add_driver_win = Window(app, title = "Add Driver", width = 400, height = 180, bg = BG_COLOR) # Use app as master
         add_driver_win.tk.resizable(False, False)
@@ -1396,7 +1445,7 @@ def open_add_driver_window(parent_window):
                 name = driver_name_entry.value.strip()
                 # --- Improved Validation ---
                 if not name:
-                    info("Input Error", "Driver Name is required.")
+                    info("Input Error", STATIC_DRIVER_ERROR_MESSAGE)
                     return
                 # --- End Improved Validation ---
 
@@ -1407,6 +1456,7 @@ def open_add_driver_window(parent_window):
                 go_back(add_driver_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
                 conn.rollback()
+                # Handle potential duplicate driver name
                 if err.errno == errorcode.ER_DUP_ENTRY: info("Database Error", "Driver name might already exist.")
                 else: info("Database Error", f"Failed to add Driver: {err.msg}")
             except Exception as e:
@@ -1438,6 +1488,9 @@ def open_add_trip_window(parent_window):
     date_entry = None
     add_button = None
     back_button = None
+
+    TRIP_REQUIRED_FIELDS = ("Coach", "Driver", "Destination", "Date")
+    STATIC_TRIP_ERROR_MESSAGE = f"Please ensure all required fields are selected/entered correctly.\nDate must be YYYY-MM-DD and not in the past: [{', '.join(TRIP_REQUIRED_FIELDS)}]"
 
     try:
         add_trip_win = Window(app, title="Add Trip", width = 400, height = 320, bg = BG_COLOR) # Use app as master
@@ -1489,30 +1542,30 @@ def open_add_trip_window(parent_window):
                 trip_date_str = date_entry.value.strip() # Use strip()
 
                 # --- Improved Validation ---
-                if not selected_coach or ":" not in selected_coach:
-                    info("Input Error", "Please select a Coach.")
-                    return
-                if not selected_driver or ":" not in selected_driver:
-                    info("Input Error", "Please select a Driver.")
-                    return
-                if not selected_destination or ":" not in selected_destination:
-                    info("Input Error", "Please select a Destination.")
-                    return
-                if not trip_date_str:
-                    info("Input Error", "Please enter a Date.")
-                    return
+                # --- Input Validation ---
+                is_invalid = False
+                # Check combo selections are valid
+                if not selected_coach or ":" not in selected_coach or "available" in selected_coach or "Error" in selected_coach: is_invalid = True
+                if not selected_driver or ":" not in selected_driver or "available" in selected_driver or "Error" in selected_driver: is_invalid = True
+                if not selected_destination or ":" not in selected_destination or "available" in selected_destination or "Error" in selected_destination: is_invalid = True
+                if not trip_date_str: is_invalid = True
 
-                date_pattern = r"^\d{4}-\d{2}-\d{2}$"
-                if not re.match(date_pattern, trip_date_str):
-                    info("Input Error", "Invalid date format. Use YYYY-MM-DD.")
-                    return
-                try:
-                    trip_date = datetime.datetime.strptime(trip_date_str, "%Y-%m-%d").date()
-                    if trip_date < datetime.date.today():
-                         info("Input Error", "Cannot add a trip with a date in the past.")
-                         return
-                except ValueError:
-                    info("Input Error", "Invalid date value (e.g., February 30th).")
+                # Validate date format and ensure it's not in the past
+                trip_date = None
+                if trip_date_str:
+                    date_pattern = r"^\d{4}-\d{2}-\d{2}$" # Regex for YYYY-MM-DD
+                    if not re.match(date_pattern, trip_date_str):
+                        is_invalid = True
+                    else:
+                        try:
+                            trip_date = datetime.datetime.strptime(trip_date_str, "%Y-%m-%d").date()
+                            if trip_date < datetime.date.today(): # Check if date is in the past
+                                 is_invalid = True
+                        except ValueError: # Handles invalid dates like 2023-02-30
+                            is_invalid = True
+
+                if is_invalid:
+                    info("Input Error", STATIC_TRIP_ERROR_MESSAGE)
                     return
 
                 coach_id = int(selected_coach.split(":")[0])
@@ -1531,8 +1584,9 @@ def open_add_trip_window(parent_window):
             except (ValueError, IndexError): info("Input Error", "Invalid selection or ID format.")
             except mysql.connector.Error as err:
                 conn.rollback()
+                # Handle specific DB errors
                 if err.errno == errorcode.ER_DUP_ENTRY: info("Database Error", "Trip details might already exist (e.g., same coach/driver/date).")
-                elif err.errno == 1452: info("Database Error", "Invalid Coach, Driver, or Destination ID.")
+                elif err.errno == 1452: info("Database Error", "Invalid Coach, Driver, or Destination ID.") # Foreign key violation
                 else: info("Database Error", f"Failed to add Trip: {err.msg}")
             except Exception as e:
                  info("Error", f"An unexpected error occurred: {e}")
@@ -1573,6 +1627,7 @@ def open_remove_booking_window(parent_window):
 
         remove_booking_combo = Combo(remove_booking_win, options=[""], width='fill')
 
+        # Populate combo with bookings for selection
         try:
             cursor.execute("""
                 SELECT b.BookingID, c.FirstName, c.Surname, t.Date, d.DestinationName
@@ -1586,6 +1641,7 @@ def open_remove_booking_window(parent_window):
             remove_booking_combo.clear()
             remove_booking_combo.append("")
             for bk in bookings_list:
+                # Format display string for clarity
                 customer_name = f"{bk['FirstName']} {bk['Surname']}" if bk['FirstName'] else "Unknown Customer"
                 trip_info = f"{bk['Date']} - {bk['DestinationName']}" if bk['Date'] else "Unknown Trip"
                 combo_text = f"{bk['BookingID']}: {customer_name} ({trip_info})"
@@ -1607,11 +1663,13 @@ def open_remove_booking_window(parent_window):
                 return
 
             try:
+                # Extract ID from selection
                 booking_id = int(selected_booking_text.split(":")[0])
             except (ValueError, IndexError):
                 info("Input Error", "Invalid booking selection format.")
                 return
 
+            # Confirm deletion with user
             if not app.yesno("Confirm Deletion", f"Are you sure you want to delete this booking?\n{selected_booking_text}"):
                  return
 
@@ -1622,7 +1680,9 @@ def open_remove_booking_window(parent_window):
                 else: info("Error", f"Booking ID {booking_id} could not be removed (might already be deleted).")
                 # Use go_back to destroy current and show parent
                 go_back(remove_booking_win, parent_window) # MODIFIED
-            except mysql.connector.Error as err: info("Database Error", f"Failed to remove Booking: {err.msg}")
+            except mysql.connector.Error as err:
+                conn.rollback()
+                info("Database Error", f"Failed to remove Booking: {err.msg}")
 
         button_box = Box(remove_booking_win, layout="grid", width="fill", align="bottom")
         remove_button = PushButton(button_box, text="Remove Selected Booking", grid=[0,0], command=remove_booking)
@@ -1684,9 +1744,16 @@ def open_remove_coach_window(parent_window):
             if not app.yesno("Confirm Deletion", f"Delete Coach?\n{selected_coach_text}"): return
 
             try:
+                # Check if coach is assigned to trips before deleting
                 cursor.execute("SELECT COUNT(*) as trip_count FROM trips WHERE CoachID = %s", (coach_id,))
-                if cursor.fetchone()['trip_count'] > 0:
-                    if not app.yesno("Warning", "This coach is assigned to trips. Deleting it may cause issues.\nContinue deletion?"): return
+                trip_count_result = cursor.fetchone()
+                if trip_count_result and trip_count_result['trip_count'] > 0:
+                    # Warn user if coach is in use and ask for confirmation again
+                    if not app.yesno("Warning: Coach in Use",
+                                     f"This coach is assigned to {trip_count_result['trip_count']} trip(s).\n"
+                                     f"Deleting it may cause issues or fail if trips reference it.\n\n"
+                                     f"Continue deletion?"):
+                        return # Stop if user cancels
 
                 cursor.execute("DELETE FROM coaches WHERE CoachID = %s", (coach_id,))
                 conn.commit()
@@ -1695,7 +1762,9 @@ def open_remove_coach_window(parent_window):
                 # Use go_back to destroy current and show parent
                 go_back(remove_coach_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                if err.errno == 1451: info("Database Error", "Cannot delete coach: It is referenced by existing trips.")
+                conn.rollback()
+                # Handle foreign key constraint violation
+                if err.errno == 1451: info("Database Error", "Cannot delete coach: It is currently assigned to one or more trips.\nPlease remove or reassign the trips first.")
                 else: info("Database Error", f"Failed to remove coach: {err.msg}")
 
         button_box = Box(remove_coach_win, layout="grid", width="fill", align="bottom")
@@ -1729,7 +1798,7 @@ def open_remove_customer_window(parent_window):
 
         try:
             # Use get_all_customers which is already ordered by ID
-            customers_list = get_all_customers()
+            customers_list = get_all_customers() # Use helper function
             remove_customer_combo.clear()
             remove_customer_combo.append("")
             if customers_list:
@@ -1738,8 +1807,8 @@ def open_remove_customer_window(parent_window):
             else:
                 remove_customer_combo.append("No customers found")
                 remove_customer_combo.disable()
-        except mysql.connector.Error as err:
-            info("Database Error", f"Failed to load customers: {err.msg}")
+        except Exception as err: # Catch potential errors loading data
+            info("Error", f"Failed to load customers: {err}")
             remove_customer_combo.append("Error loading data")
             remove_customer_combo.disable()
 
@@ -1755,13 +1824,19 @@ def open_remove_customer_window(parent_window):
                 info("Input Error", "Invalid customer selection format.")
                 return
 
-            if not app.yesno("Confirm Deletion", f"Delete Customer and related bookings?\n{selected_customer_text}"): return
+            if not app.yesno("Confirm Deletion", f"Delete Customer?\n{selected_customer_text}"): return
 
             try:
+                # Check for related bookings before deleting customer
                 cursor.execute("SELECT COUNT(*) as booking_count FROM bookings WHERE CustomerID = %s", (customer_id,))
-                if cursor.fetchone()['booking_count'] > 0:
-                     if not app.yesno("Warning", "This customer has bookings. Deleting the customer will also delete their bookings.\nContinue?"): return
-                     # cursor.execute("DELETE FROM bookings WHERE CustomerID = %s", (customer_id,)) # Uncomment if ON DELETE CASCADE not set in DB
+                booking_count_result = cursor.fetchone()
+                if booking_count_result and booking_count_result['booking_count'] > 0:
+                     # Warn that deleting customer might delete bookings
+                     if not app.yesno("Warning: Customer Has Bookings",
+                                      f"This customer has {booking_count_result['booking_count']} booking(s).\n"
+                                      f"Deleting the customer will likely delete their bookings too (if cascading deletes are enabled).\n\n"
+                                      f"Continue?"):
+                         return # Stop if user cancels
 
                 cursor.execute("DELETE FROM customers WHERE CustomerID = %s", (customer_id,))
                 conn.commit()
@@ -1770,7 +1845,9 @@ def open_remove_customer_window(parent_window):
                 # Use go_back to destroy current and show parent
                 go_back(remove_customer_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                if err.errno == 1451: info("Database Error", "Cannot delete customer due to related bookings (foreign key constraint).")
+                conn.rollback()
+                # Handle FK error
+                if err.errno == 1451: info("Database Error", "Cannot delete customer: They have existing bookings.\nPlease remove their bookings first.")
                 else: info("Database Error", f"Failed to remove customer: {err.msg}")
 
         button_box = Box(remove_customer_win, layout="grid", width="fill", align="bottom")
@@ -1833,9 +1910,16 @@ def open_remove_destination_window(parent_window):
             if not app.yesno("Confirm Deletion", f"Delete Destination?\n{selected_destination_text}"): return
 
             try:
+                # Check for related trips before deleting
                 cursor.execute("SELECT COUNT(*) as trip_count FROM trips WHERE DestinationID = %s", (destination_id,))
-                if cursor.fetchone()['trip_count'] > 0:
-                    if not app.yesno("Warning", "This destination is used in trips. Deleting it may cause issues.\nContinue deletion?"): return
+                trip_count_result = cursor.fetchone()
+                if trip_count_result and trip_count_result['trip_count'] > 0:
+                    # Warn user if destination is in use
+                    if not app.yesno("Warning: Destination in Use",
+                                     f"This destination is used in {trip_count_result['trip_count']} trip(s).\n"
+                                     f"Deleting it may cause issues or fail if trips reference it.\n\n"
+                                     f"Continue deletion?"):
+                        return
 
                 cursor.execute("DELETE FROM destinations WHERE DestinationID = %s", (destination_id,))
                 conn.commit()
@@ -1844,7 +1928,9 @@ def open_remove_destination_window(parent_window):
                 # Use go_back to destroy current and show parent
                 go_back(remove_destination_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                if err.errno == 1451: info("Database Error", "Cannot delete destination: It is referenced by existing trips.")
+                conn.rollback()
+                # Handle FK constraint violation
+                if err.errno == 1451: info("Database Error", "Cannot delete destination: It is currently used in one or more trips.\nPlease remove or reassign the trips first.")
                 else: info("Database Error", f"Failed to remove destination: {err.msg}")
 
         button_box = Box(remove_destination_win, layout="grid", width="fill", align="bottom")
@@ -1906,9 +1992,16 @@ def open_remove_driver_window(parent_window):
             if not app.yesno("Confirm Deletion", f"Delete Driver?\n{selected_driver_text}"): return
 
             try:
+                # Check for related trips before deleting
                 cursor.execute("SELECT COUNT(*) as trip_count FROM trips WHERE DriverID = %s", (driver_id,))
-                if cursor.fetchone()['trip_count'] > 0:
-                     if not app.yesno("Warning", "This driver is assigned to trips. Deleting them may cause issues.\nContinue deletion?"): return
+                trip_count_result = cursor.fetchone()
+                if trip_count_result and trip_count_result['trip_count'] > 0:
+                     # Warn user if driver is assigned to trips
+                     if not app.yesno("Warning: Driver Assigned to Trips",
+                                      f"This driver is assigned to {trip_count_result['trip_count']} trip(s).\n"
+                                      f"Deleting them may cause issues or fail if trips reference them.\n\n"
+                                      f"Continue deletion?"):
+                         return
 
                 cursor.execute("DELETE FROM drivers WHERE DriverID = %s", (driver_id,))
                 conn.commit()
@@ -1917,7 +2010,9 @@ def open_remove_driver_window(parent_window):
                 # Use go_back to destroy current and show parent
                 go_back(remove_driver_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                 if err.errno == 1451: info("Database Error", "Cannot delete driver: They are referenced by existing trips.")
+                 conn.rollback()
+                 # Handle FK constraint violation
+                 if err.errno == 1451: info("Database Error", "Cannot delete driver: They are currently assigned to one or more trips.\nPlease remove or reassign the trips first.")
                  else: info("Database Error", f"Failed to remove driver: {err.msg}")
 
         button_box = Box(remove_driver_win, layout="grid", width="fill", align="bottom")
@@ -1950,6 +2045,7 @@ def open_remove_trip_window(parent_window):
         remove_trip_combo = Combo(remove_trip_win, options=[""], width='fill')
 
         try:
+            # Fetch trips with destination details for identification
             cursor.execute("""
                 SELECT t.TripID, t.Date, d.DestinationName FROM trips t
                 LEFT JOIN destinations d ON t.DestinationID = d.DestinationID
@@ -1982,12 +2078,19 @@ def open_remove_trip_window(parent_window):
                 info("Input Error", "Invalid trip selection format.")
                 return
 
-            if not app.yesno("Confirm Deletion", f"Delete Trip and related bookings?\n{selected_trip_text}"): return
+            if not app.yesno("Confirm Deletion", f"Delete Trip?\n{selected_trip_text}"): return # Single confirmation first
 
             try:
+                # Check for related bookings before deleting trip
                 cursor.execute("SELECT COUNT(*) as booking_count FROM bookings WHERE TripID = %s", (trip_id,))
-                if cursor.fetchone()['booking_count'] > 0:
-                    if not app.yesno("Warning", "This trip has bookings. Deleting the trip will also delete its bookings.\nContinue?"): return
+                booking_count_result = cursor.fetchone()
+                if booking_count_result and booking_count_result['booking_count'] > 0:
+                    # Warn that deleting trip might delete bookings
+                    if not app.yesno("Warning: Trip Has Bookings",
+                                     f"This trip has {booking_count_result['booking_count']} booking(s).\n"
+                                     f"Deleting the trip will likely delete its bookings too (if cascading deletes are enabled).\n\n"
+                                     f"Continue?"):
+                        return
                     # cursor.execute("DELETE FROM bookings WHERE TripID = %s", (trip_id,)) # Uncomment if ON DELETE CASCADE not set in DB
 
                 cursor.execute("DELETE FROM trips WHERE TripID = %s", (trip_id,))
@@ -1997,7 +2100,9 @@ def open_remove_trip_window(parent_window):
                 # Use go_back to destroy current and show parent
                 go_back(remove_trip_win, parent_window) # MODIFIED
             except mysql.connector.Error as err:
-                if err.errno == 1451: info("Database Error", "Cannot delete trip due to related bookings (foreign key constraint).")
+                conn.rollback()
+                # Handle FK error
+                if err.errno == 1451: info("Database Error", "Cannot delete trip: It has existing bookings.\nPlease remove the bookings first.")
                 else: info("Database Error", f"Failed to remove trip: {err.msg}")
 
         button_box = Box(remove_trip_win, layout="grid", width="fill", align="bottom")
@@ -2020,19 +2125,23 @@ def open_remove_trip_window(parent_window):
 # --- Query Window ---
 # Modified: Added parent_window parameter and use it for Back button
 def open_query_window(parent_window):
-    """Opens a window for executing various predefined database queries."""
+    """Opens a window for executing various predefined database queries (Admin only)."""
     parent_window.hide() # Hide the calling menu
 
     global query_window # Still use global for simplicity, though class structure would be better
-    query_window = Window(app, title="Database Queries", width=800, height=600, bg=BG_COLOR) # Use app as master
+    # Uses global for simplicity, allows nested functions to potentially access if needed.
+    query_window = Window(app, title="Database Queries (Admin)", width=800, height=600, bg=BG_COLOR) # Use app as master
     Text(query_window, text="Select a Query:", color=TEXT_COLOR)
 
     # --- Query 1: Passengers by Trip --- (MODIFIED for Grid View)
+    # --- Query 1: Passengers on a Specific Trip ---
     def lincoln_passengers():
+        """Opens a sub-window to select a trip, then displays its passenger list."""
         selection_window = Window(query_window, title="Select Trip for Passenger List", width=450, height=200, bg=BG_COLOR)
         Text(selection_window, text="Select Trip:", color=TEXT_COLOR)
         trip_query_combo = Combo(selection_window, options=[], width="fill")
 
+        # Populate trip combo
         try: # Populate Trip ComboBox
             cursor.execute("""
                 SELECT t.TripID, t.Date, d.DestinationName FROM trips t
@@ -2048,8 +2157,9 @@ def open_query_window(parent_window):
                 trip_query_combo.append("No trips available")
                 trip_query_combo.disable()
         except mysql.connector.Error as err:
-            info("Database Error", f"Error fetching trips: {err}"); selection_window.destroy(); return
+            info("Database Error", f"Error fetching trips for query: {err}"); selection_window.destroy(); return
 
+        # Inner function to run query and display results
         def run_passenger_query():
             selected_trip_text = trip_query_combo.value
             if not selected_trip_text or ":" not in selected_trip_text:
@@ -2058,12 +2168,14 @@ def open_query_window(parent_window):
 
             try:
                 # Extract Trip ID and Destination Name from the combo text
+                # Extract trip ID and description
                 parts = selected_trip_text.split(":", 1)
                 trip_id = int(parts[0])
                 trip_desc = parts[1].strip() # Contains "YYYY-MM-DD - DestinationName"
                 dest_name_parts = trip_desc.split(" - ", 1)
-                destination_name = dest_name_parts[1] if len(dest_name_parts) > 1 else "Unknown Destination"
+                destination_name = dest_name_parts[1] if len(dest_name_parts) > 1 else "Selected Trip"
 
+                # Fetch passenger data for the selected trip
                 cursor.execute("""
                     SELECT c.CustomerID, c.FirstName, c.Surname, b.NumberofPeople
                     FROM customers c
@@ -2074,6 +2186,7 @@ def open_query_window(parent_window):
                 passengers = cursor.fetchall()
 
                 # --- Create Grid View Window ---
+                # Create results window
                 result_window = Window(query_window, title=f"Passengers - Trip {trip_id}: {destination_name}", width=600, height=450, bg=BG_COLOR)
 
                 # Main container for the grid
@@ -2087,10 +2200,12 @@ def open_query_window(parent_window):
                 data_keys = ["CustomerID", "FirstName", "Surname", "NumberofPeople"]
 
                 # Create Headers
+                # Add headers
                 for col, header in enumerate(headers):
                     Text(grid_box, text=header, grid=[col, 0], color=TEXT_COLOR, size=11, font="Arial", bold=True, align="left")
 
                 # Create Data Rows
+                # Add data rows
                 if passengers:
                     for row, passenger_dict in enumerate(passengers, start=1):
                         for col, key in enumerate(data_keys):
@@ -2098,6 +2213,7 @@ def open_query_window(parent_window):
                             Text(grid_box, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10, align="left")
                 else:
                     # Display message within the grid box if no results
+                    # Span the message across the header width if no trips found
                     Text(grid_box, text="No passengers booked on this trip.", color=TEXT_COLOR, grid=[0, 1, len(headers), 1], align="left")
 
                 # Add a single Back/Close button
@@ -2105,14 +2221,14 @@ def open_query_window(parent_window):
                 close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
 
                 result_window.show()
-                selection_window.destroy() # Close the selection window
+                selection_window.destroy() # Close the selection window # Close selection window after showing results
 
             except (ValueError, IndexError):
                 info("Input Error", "Invalid trip selection format.")
             except mysql.connector.Error as err:
                 info("Database Error", f"Error fetching passenger data: {err}")
             except Exception as e:
-                 info("Error", f"An unexpected error occurred: {e}")
+                 info("Error", f"An unexpected error occurred displaying passengers: {e}")
                  import traceback; traceback.print_exc()
 
         btn_box = Box(selection_window, layout="grid", width="fill", align="bottom")
@@ -2124,54 +2240,116 @@ def open_query_window(parent_window):
     # END of lincoln_passengers
 
     # --- Query 2: Available trips ---
+    # --- Query 2: Available Upcoming Trips (MODIFIED TO USE GRID) --- 
     def available_trips():
+        """Queries and displays upcoming trips with calculated available seats in a grid."""
         try:
+            # Fetches trips on or after today's date.
             cursor.execute("""
                 SELECT t.TripID, t.Date, d.DestinationName, d.CityName, c.Seats,
                        COALESCE((SELECT SUM(b.NumberofPeople) FROM bookings b WHERE b.TripID = t.TripID), 0) AS BookedSeats
-                FROM trips t JOIN destinations d ON t.DestinationID = d.DestinationID JOIN coaches c ON t.CoachID = c.CoachID
-                WHERE t.Date >= CURDATE() ORDER BY t.Date ASC
+                FROM trips t
+                JOIN destinations d ON t.DestinationID = d.DestinationID
+                JOIN coaches c ON t.CoachID = c.CoachID
+                WHERE t.Date >= CURDATE()
+                ORDER BY t.Date ASC
             """)
             trips = cursor.fetchall()
-            result_window = Window(query_window, title="Available Trips (Upcoming)", width=650, height=400, bg=BG_COLOR)
-            result_list = ListBox(result_window, width="fill", height="fill", scrollbar=True)
+
+            # Create results window
+            result_window = Window(query_window, title="Available Trips (Upcoming)", width=700, height=450, bg=BG_COLOR) # Increased width slightly
+            grid_container = Box(result_window, width="fill", height="fill", border=1)
+            grid_box = Box(grid_container, layout="grid", width="fill", align="top")
+            back_button_box = Box(result_window, width="fill", align="bottom")
+
+            headers = ["ID", "Date", "Destination", "City", "Seats Avail."]
+            # Define data keys, adding a temporary key for the calculated available seats
+            data_keys = ["TripID", "Date", "DestinationName", "CityName", "AvailableSeats"]
+
+            # Add headers
+            for col, header in enumerate(headers):
+                Text(grid_box, text=header, grid=[col, 0], color=TEXT_COLOR, size=11, font="Arial", bold=True, align="left")
+
             if trips:
-                result_list.append(f"{'ID':<5}{'Date':<12}{'Destination':<25}{'City':<15}{'Seats Avail.':<12}")
-                result_list.append("-" * 70)
-                for trip in trips:
-                     available = trip['Seats'] - trip['BookedSeats']
-                     result_list.append(f"{trip['TripID']:<5}{trip['Date']!s:<12}{trip['DestinationName']:<25}{trip['CityName']:<15}{available:<12}")
-            else: result_list.append("No upcoming trips currently available.")
-            close_button = PushButton(result_window, text = "Close", command = result_window.destroy, align="bottom")
+                # Add data rows
+                for row, trip_dict in enumerate(trips, start=1):
+                    # Calculate available seats and add to the dictionary for this row
+                    available = trip_dict['Seats'] - trip_dict['BookedSeats']
+                    trip_dict['AvailableSeats'] = available # Add the calculated value
+
+                    for col, key in enumerate(data_keys):
+                        raw_value = trip_dict.get(key, '')
+                        # Format data for display
+                        if isinstance(raw_value, datetime.date):
+                            data_to_display = raw_value.strftime('%Y-%m-%d')
+                        elif isinstance(raw_value, (int, float)):
+                             data_to_display = str(raw_value)
+                        elif raw_value is None:
+                            data_to_display = ""
+                        else:
+                            data_to_display = str(raw_value)
+
+                        Text(grid_box, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10, align="left")
+            else:
+                # Span the message across the header width if no trips found
+                Text(grid_box, text="No upcoming trips currently available.", color=TEXT_COLOR, grid=[0, 1, len(headers), 1], align="left")
+
+            close_button = PushButton(back_button_box, text="Close", command=result_window.destroy, align="right")
             close_button.bg = BUTTON_BG_COLOR; close_button.text_color = BUTTON_TEXT_COLOR
+
             result_window.show()
-        except mysql.connector.Error as err: info("Database Error", f"Error fetching trip data: {err}")
+
+        except mysql.connector.Error as err:
+            info("Database Error", f"Error fetching available trip data: {err}")
+            # Optionally display error in the window if it exists
+            try:
+                if result_window and result_window.visible:
+                    clear_box(grid_box) # Clear previous content attempt
+                    Text(grid_box, text=f"Database Error:\n{err}", color="red", size=12, grid=[0, 0])
+            except NameError: # Handle case where result_window wasn't created yet
+                 pass
+        except Exception as e:
+            info("Error", f"An unexpected error occurred displaying available trips: {e}")
+            try:
+                 if result_window and result_window.visible:
+                    clear_box(grid_box)
+                    Text(grid_box, text=f"Unexpected Error:\n{e}", color="red", size=12, grid=[0, 0])
+            except NameError:
+                 pass
+            import traceback; traceback.print_exc()
+
 
     # --- Query 3: Customers by Postcode ---
+    # --- Query 3: Customers by Postcode Area ---
     def postcode_customers():
+        """Opens a sub-window for postcode input, displays matching customers with pagination."""
         postcode_window = Window(query_window, title="Enter Postcode Area", width=300, height=150, bg=BG_COLOR)
-        Text(postcode_window, text="Enter Postcode (e.g., 'SW1A'):", color=TEXT_COLOR)
+        Text(postcode_window, text="Enter Postcode Prefix (e.g., 'SW1A'):", color=TEXT_COLOR)
         postcode_entry = TextBox(postcode_window, width='fill')
+        postcode_entry.focus()
 
-        # This function will handle displaying a specific page of results
+        # --- Helper function to display a specific page of postcode results ---
         def display_postcode_results(postcode, page, result_window, grid_box, pagination_box):
+            """Fetches and displays a page of customers matching the postcode prefix."""
             try:
-                offset = page * query_records_per_page
-                postcode_like = postcode + '%'
+                offset = page * query_records_per_page # Uses specific page size for this query
+                postcode_like = postcode + '%' # Prepares for LIKE query, case-insensitive
 
                 # Get total count for pagination
+                # Count total matching records for pagination
                 count_query = "SELECT COUNT(*) as total FROM customers WHERE UPPER(Postcode) LIKE %s"
                 cursor.execute(count_query, (postcode_like,))
                 total_records = cursor.fetchone()['total']
                 total_pages = (total_records + query_records_per_page - 1) // query_records_per_page
 
                 # Fetch records for the current page
+                # Fetch data for the current page
                 data_query = """
                     SELECT CustomerID, FirstName, Surname, AddressLine1, Postcode
                     FROM customers
-                    WHERE UPPER(Postcode) LIKE %s
+                    WHERE UPPER(Postcode) LIKE %s /* Case-insensitive match */
                     ORDER BY Postcode, Surname
-                    LIMIT %s OFFSET %s
+                    LIMIT %s OFFSET %s /* Pagination */
                 """
                 cursor.execute(data_query, (postcode_like, query_records_per_page, offset))
                 customers = cursor.fetchall()
@@ -2182,7 +2360,7 @@ def open_query_window(parent_window):
 
                 if customers:
                     headers = ["ID", "Name", "Address", "Postcode"]
-                    data_keys = ["CustomerID", "Name", "AddressLine1", "Postcode"]
+                    data_keys = ["CustomerID", "Name", "AddressLine1", "Postcode"] # 'Name' generated below
 
                     # Create Headers
                     for col, header in enumerate(headers):
@@ -2190,20 +2368,23 @@ def open_query_window(parent_window):
 
                     # Create Data Rows
                     for row, customer_dict in enumerate(customers, start=1):
+                        # Combine first/last name for display
                         full_name = f"{customer_dict.get('FirstName', '')} {customer_dict.get('Surname', '')}"
-                        customer_dict['Name'] = full_name
+                        customer_dict['Name'] = full_name # Add to dict for easy access via data_keys
 
                         for col, key in enumerate(data_keys):
                             data_to_display = str(customer_dict.get(key, ''))
                             Text(grid_box, text=data_to_display, grid=[col, row], color=TEXT_COLOR, size=10, align="left")
                 else:
                     # Display message within the grid box if no results on this page (shouldn't happen if total_records > 0)
-                    if page == 0:
-                       Text(grid_box, text=f"No customers found starting with postcode {postcode}.", color=TEXT_COLOR, grid=[0, 1, len(headers), 1], align="left")
+                    if page == 0: # Only show "No customers" on first page attempt
+                       Text(grid_box, text=f"No customers found starting with postcode '{postcode}'.", color=TEXT_COLOR, grid=[0, 1, 4, 1], align="left")
 
                 # --- Create Pagination Controls ---
+                # Add Pagination Controls
                 if page > 0:
                     prev_button = PushButton(pagination_box, text="<< Previous",
+                                             # Lambda calls this same display function for the previous page
                                              command=lambda p=page: display_postcode_results(postcode, p - 1, result_window, grid_box, pagination_box),
                                              grid=[0, 0], align="left")
                     prev_button.bg = BUTTON_BG_COLOR; prev_button.text_color = BUTTON_TEXT_COLOR
@@ -2212,22 +2393,21 @@ def open_query_window(parent_window):
 
                 if page < total_pages - 1:
                     next_button = PushButton(pagination_box, text="Next >>",
+                                             # Lambda calls this display function for the next page
                                              command=lambda p=page: display_postcode_results(postcode, p + 1, result_window, grid_box, pagination_box),
                                              grid=[2, 0], align="left")
                     next_button.bg = BUTTON_BG_COLOR; next_button.text_color = BUTTON_TEXT_COLOR
 
             except mysql.connector.Error as err:
-                clear_box(grid_box)
-                clear_box(pagination_box)
+                clear_box(grid_box); clear_box(pagination_box)
                 Text(grid_box, text=f"Database Error:\n{err}", color="red", size=12, grid=[0, 0])
                 print(f"DB Error displaying postcode results: {err}")
             except Exception as e:
-                clear_box(grid_box)
-                clear_box(pagination_box)
-                Text(grid_box, text=f"Error:\n{e}", color="red", size=12, grid=[0, 0])
+                clear_box(grid_box); clear_box(pagination_box)
+                Text(grid_box, text=f"An unexpected error occurred:\n{e}", color="red", size=12, grid=[0, 0])
                 import traceback; traceback.print_exc()
 
-
+        # --- Inner function to trigger postcode query and open results window ---
         def run_postcode_query():
             postcode = postcode_entry.value.strip().upper()
             if not postcode: info("Input Error", "Please enter a postcode area."); return
@@ -2240,14 +2420,17 @@ def open_query_window(parent_window):
             back_button_box = Box(result_window, width="fill", align="bottom") # Box for the back button
 
             # Call the display function for the first page
+            # Call helper to display the first page of results
             display_postcode_results(postcode, 0, result_window, grid_box, pagination_box)
 
             # Add a single Back/Close button
             back_button = PushButton(back_button_box, text="Back to Queries", command=result_window.destroy, align="right")
+            # Back button command needed adjustment from original, just use destroy
+            # back_button = PushButton(back_button_box, text="Close Results", command=result_window.destroy, align="right")
             back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
 
             result_window.show()
-            postcode_window.destroy()
+            postcode_window.destroy() # Close input window
 
 
         btn_box = Box(postcode_window, layout="grid", width="fill", align="bottom")
@@ -2258,11 +2441,14 @@ def open_query_window(parent_window):
         postcode_window.show()
 
     # --- Query 4: Trip Income ---
+    # --- Query 4: Calculate Total Income for a Trip ---
     def trip_income_window():
+        """Opens a sub-window to select a trip, then calculates and displays its total booking income."""
         income_window = Window(query_window, title = "Calculate Trip Income", width = 400, height = 200, bg = BG_COLOR)
         Text(income_window, text="Select Trip:", color=TEXT_COLOR) # Changed to Combo
         trip_income_combo = Combo(income_window, options=[], width='fill')
 
+        # Populate trip combo
         try: # Populate Trip ComboBox
             cursor.execute("""
                 SELECT t.TripID, t.Date, d.DestinationName FROM trips t
@@ -2278,8 +2464,9 @@ def open_query_window(parent_window):
                 trip_income_combo.append("No trips available")
                 trip_income_combo.disable()
         except mysql.connector.Error as err:
-            info("Database Error", f"Error fetching trips: {err}"); income_window.destroy(); return
+            info("Database Error", f"Error fetching trips for income: {err}"); income_window.destroy(); return
 
+        # Inner function to calculate and display income
         def calculate_income():
             selected_trip_income = trip_income_combo.value
             if not selected_trip_income or ":" not in selected_trip_income:
@@ -2287,21 +2474,25 @@ def open_query_window(parent_window):
                 return
             try:
                 trip_id = int(selected_trip_income.split(":")[0])
+                # Query to SUM BookingCost for the selected trip
                 cursor.execute("SELECT SUM(b.BookingCost) AS TotalIncome FROM bookings b WHERE b.TripID = %s", (trip_id,))
                 result = cursor.fetchone()
+                # Get sum, default to 0 if null
                 income = result['TotalIncome'] if result and result['TotalIncome'] is not None else 0
+                # Display result in info popup, formatted as currency
                 info(f"Income for Trip {trip_id}", f"Total Booking Income: £{income:.2f}")
             except (ValueError, IndexError): info("Input Error", "Invalid trip selection.")
             except mysql.connector.Error as err: info("Database Error", f"Error calculating income: {err}")
 
         btn_box = Box(income_window, layout="grid", width="fill", align="bottom")
         calculate_button = PushButton(btn_box, text = "Calculate Income", grid=[0,0], command = calculate_income)
-        cancel_button = PushButton(btn_box, text = "Close", grid=[1,0], command = income_window.destroy)
+        cancel_button = PushButton(btn_box, text = "Close", grid=[1,0], command = income_window.destroy) # Close selection window
         calculate_button.bg = BUTTON_BG_COLOR; calculate_button.text_color = BUTTON_TEXT_COLOR
         cancel_button.bg = BUTTON_BG_COLOR; cancel_button.text_color = BUTTON_TEXT_COLOR
         income_window.show()
 
     # --- Buttons for each query ---
+    # --- Buttons on the main Query Window to trigger each query ---
     query_button_box = Box(query_window, layout="grid", width="fill")
     passengers_button = PushButton(query_button_box, text="Passengers by Trip", grid=[0,0], width=20, command=lincoln_passengers)
     trips_button = PushButton(query_button_box, text="Available Trips", grid=[1,0], width=20, command=available_trips)
@@ -2311,6 +2502,7 @@ def open_query_window(parent_window):
          if isinstance(button, PushButton): button.bg = BUTTON_BG_COLOR; button.text_color = BUTTON_TEXT_COLOR
 
     # Modified Back Button to use go_back with the passed parent_window
+    # Back button to return to the menu from which Queries was opened (passed as parent_window)
     back_button = PushButton(query_window, text="Back to Menu",
                              command=lambda: go_back(query_window, parent_window), # MODIFIED
                              align="bottom")
@@ -2319,6 +2511,7 @@ def open_query_window(parent_window):
 
 # --- Login and Main App ---
 def check_admin_login():
+    """Validates hardcoded admin credentials."""
     if username_entry.value.lower() == "admin" and password_entry.value == "admin":
         open_admin_main_window()
     else:
@@ -2327,20 +2520,21 @@ def check_admin_login():
 
 
 def open_admin_login_window():
+    """Opens the admin login prompt."""
     app.hide()
     global admin_login_window, username_entry, password_entry
     admin_login_window = Window(app, title="Admin Login", width=300, height=200, bg=BG_COLOR)
     Text(admin_login_window, text="Username:", color=TEXT_COLOR)
     username_entry = TextBox(admin_login_window, width="fill")
     Text(admin_login_window, text="Password:", color=TEXT_COLOR)
-    password_entry = TextBox(admin_login_window, hide_text=True, width="fill")
-    username_entry.focus() # Set focus to username field
+    password_entry = TextBox(admin_login_window, hide_text=True, width="fill") # hide_text masks password
+    username_entry.focus() # Set focus to username field # Set focus for convenience
 
     button_box = Box(admin_login_window, layout="grid", width="fill")
     login_button = PushButton(button_box, text="Login", grid=[0,0], command=check_admin_login)
     # Back button closes login and shows main app window
     back_button = PushButton(button_box, text="Back", grid=[1,0],
-                             command=lambda: go_back(admin_login_window, app)) # Use go_back correctly
+                             command=lambda: go_back(admin_login_window, app)) # Use go_back correctly # Back to main app screen
 
     login_button.bg = BUTTON_BG_COLOR; login_button.text_color = BUTTON_TEXT_COLOR
     back_button.bg = BUTTON_BG_COLOR; back_button.text_color = BUTTON_TEXT_COLOR
@@ -2362,13 +2556,17 @@ staff_button = PushButton(button_container, text="Staff Menu", grid=[1,0], comma
 admin_button.bg = BUTTON_BG_COLOR; admin_button.text_color = BUTTON_TEXT_COLOR
 staff_button.bg = BUTTON_BG_COLOR; staff_button.text_color = BUTTON_TEXT_COLOR
 
+# Configure grid weights to make the logo area expand vertically on resize.
 app.tk.grid_columnconfigure(0, weight=1)
 app.tk.grid_columnconfigure(1, weight=1)
-app.tk.grid_rowconfigure(0, weight=1) # Logo area gets more space
-app.tk.grid_rowconfigure(1, weight=0)
-app.tk.grid_rowconfigure(2, weight=0)
+app.tk.grid_rowconfigure(0, weight=1) # Logo area gets more space # Logo row expands
+app.tk.grid_rowconfigure(1, weight=0) # Title row fixed
+app.tk.grid_rowconfigure(2, weight=0) # Button row fixed
 
+# --- Global Window Variable Declarations ---
 # Define window variables globally *before* they might be used in lambdas/comparisons
+# Define window variables globally. Initialized to None.
+# Necessary for functions that need to show/hide/destroy these windows from different scopes.
 admin_login_window = None
 admin_main_window = None
 customers_window = None
@@ -2383,9 +2581,12 @@ staff_trips_window = None
 query_window = None
 # Add/Remove windows are temporary, no need for global refs unless reused
 
+# --- Start the GUI Event Loop ---
 app.display()
 
+# --- Cleanup: Close Database Connection on Exit ---
 # --- Close Connection ---
+# Ensures the database connection is closed when the application window is closed.
 if conn and conn.is_connected():
     cursor.close()
     conn.close()
