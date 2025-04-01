@@ -2546,7 +2546,6 @@ def open_admin_login_window():
 app = App("Silver Dawn Coaches", layout="grid", bg=BG_COLOR, width=800, height=600)
 
 logo = Picture(app, image="silverDawnLogo.png", grid=[0, 0, 2, 1])
-if not logo.image: Text(app, text="[Logo Image Not Found]", color="yellow", grid=[0, 0, 2, 1])
 
 title = Text(app, text="SILVER DAWN COACHES\nBOOKING & DATA SYSTEM", size=16, font="Arial", grid=[0, 1, 2, 1], color=TEXT_COLOR)
 
@@ -2579,7 +2578,6 @@ staff_bookings_window = None
 staff_destinations_window = None
 staff_trips_window = None
 query_window = None
-# Add/Remove windows are temporary, no need for global refs unless reused
 
 # --- Start the GUI Event Loop ---
 app.display()
