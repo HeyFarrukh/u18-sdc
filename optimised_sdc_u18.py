@@ -128,7 +128,7 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
     try:
         search_value = None
         if search_term and search_field:
-            search_value = f"%{search_term}%" 
+            search_value = f"%{search_term}%"
 
         # --- Configure Query, Columns, and Search Logic for Each Table ---
         # --- Dynamically configure Query and Columns based on the requested table_name ---
@@ -270,8 +270,8 @@ def fetch_and_display_table(table_name, table_box, pagination_box, page=0, searc
             return
 
         # --- Data Key Mapping ---
-        # Maps the display column headers 
-        # keys/aliases used in the SELECT query result dictionary 
+        # Maps the display column headers
+        # keys/aliases used in the SELECT query result dictionary
         # Necessary because some display headers differ from the database column names or aliases.
         data_key_map = {}
         if table_name == "bookings": data_key_map = {"ID": "BookingID", "Cust. ID": "CustomerID", "Customer Name": "CustomerName", "Trip ID": "TripID", "Destination": "DestinationName", "Trip Date": "TripDate", "# People": "NumberofPeople", "Cost": "Cost", "Request": "SpecialRequest", "Booking Date": "BookingDate"}
@@ -690,7 +690,7 @@ def open_admin_main_window():
     drivers_button = PushButton(button_box, text="DRIVERS", width=15, command=open_drivers_window)
     # Pass admin_main_window as the parent to return to
     search_button = PushButton(button_box, text="QUERIES", width=15,
-                               command=lambda: open_query_window(admin_main_window)) 
+                               command=lambda: open_query_window(admin_main_window))
     back_button = PushButton(button_box, text="Logout", width=15, command=lambda: go_back_to_main_menu(admin_main_window))
 
     customers_button.bg = BUTTON_BG_COLOR; customers_button.text_color = BUTTON_TEXT_COLOR
@@ -810,7 +810,7 @@ def open_staff_window():
 
 #region Add Windows
 
-# Modified: Added parent_window parameter
+# Modified: Added parent_window parameter and specific error messages
 def open_add_customer_window(parent_window):
     parent_window.hide() # Hide the menu while adding
 
@@ -828,9 +828,9 @@ def open_add_customer_window(parent_window):
     add_button = None
     back_button = None
 
-    # Define required fields and error message for validation feedback.
-    CUSTOMER_REQUIRED_FIELDS = ("First Name", "Surname", "Email", "Address Line 1", "City", "Postcode", "Phone Number")
-    STATIC_ERROR_MESSAGE = f"Please ensure all required fields are entered correctly: [{', '.join(CUSTOMER_REQUIRED_FIELDS)}]"
+    # --- REMOVED STATIC ERROR MESSAGE ---
+    # CUSTOMER_REQUIRED_FIELDS = ("First Name", "Surname", "Email", "Address Line 1", "City", "Postcode", "Phone Number")
+    # STATIC_ERROR_MESSAGE = f"Please ensure all required fields are entered correctly: [{', '.join(CUSTOMER_REQUIRED_FIELDS)}]"
 
     try:
         add_customer_win = Window(app, title="Add Customer", width=450, height=600, bg=BG_COLOR) # Use app as master
@@ -878,6 +878,7 @@ def open_add_customer_window(parent_window):
         Text(form_box, text="Special Notes:", color=TEXT_COLOR, grid=[0, 9], align="left")
         notes_entry = TextBox(form_box, width=25, grid=[1, 9], align="left", multiline=True, height=4) # Multiline
 
+        # --- MODIFIED add_customer function with specific validation ---
         def add_customer():
             try:
                 # Get values from local widget variables
@@ -888,26 +889,44 @@ def open_add_customer_window(parent_window):
                 city = city_entry.value.strip()
                 postcode = postcode_entry.value.strip()
                 phone = phone_entry.value.strip()
-                address2 = address2_entry.value.strip()
-                notes = notes_entry.value.strip()
+                address2 = address2_entry.value.strip() # Optional
+                notes = notes_entry.value.strip()       # Optional
 
-                # --- Improved Validation ---
-                # --- Input Validation ---
-                is_missing = not first_name or not surname or not email or not address1 or not city or not postcode or not phone
-                email_valid = True
+                # --- Specific Validation Logic ---
+                error_messages = [] # List to hold specific error messages
+
+                # Check each required field
+                if not first_name:
+                    error_messages.append("First Name is required.")
+                if not surname:
+                    error_messages.append("Surname is required.")
+                if not email:
+                    error_messages.append("Email is required.")
+                if not address1:
+                    error_messages.append("Address Line 1 is required.")
+                if not city:
+                    error_messages.append("City is required.")
+                if not postcode:
+                    error_messages.append("Postcode is required.")
+                if not phone:
+                    error_messages.append("Phone Number is required.")
+
+                # Check email format only if email was provided
                 if email:
-                    # Basic email format validation using regex.
                     email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
                     if not re.match(email_regex, email):
-                        email_valid = False
+                        error_messages.append("Email format is invalid (e.g., user@example.com).")
 
-                if is_missing or not email_valid:
-                    info("Input Error", STATIC_ERROR_MESSAGE + ("\nInvalid email format." if not email_valid and email else ""))
-                    return
-                # --- End Improved Validation ---
+                # If any errors were found, display them and return
+                if error_messages:
+                    # Combine all specific errors into one message
+                    final_error_message = "Please correct the following errors:\n- " + "\n- ".join(error_messages)
+                    info("Input Error", final_error_message)
+                    return # Stop processing
+                # --- End Specific Validation Logic ---
 
 
-                # --- Database Insertion ---
+                # --- Database Insertion (only if validation passes) ---
                 cursor.execute("""
                     INSERT INTO customers (FirstName, Surname, Email, AddressLine1,
                                            AddressLine2, City, Postcode, PhoneNumber, SpecialNotes)
@@ -918,10 +937,10 @@ def open_add_customer_window(parent_window):
                 info("Success", "Customer added successfully.")
                 # Use go_back to destroy current and show parent
                 go_back(add_customer_win, parent_window) # MODIFIED
+
             except mysql.connector.Error as err:
                 conn.rollback()
                 print(f"Database error adding customer: {err}")
-                # More specific DB errors
                 # Provide specific feedback for duplicate entry errors (e.g., unique email constraint).
                 if err.errno == errorcode.ER_DUP_ENTRY:
                      info("Database Error", f"Failed to add customer.\nPossible duplicate entry (e.g., email): {err.msg}")
@@ -930,6 +949,7 @@ def open_add_customer_window(parent_window):
             except Exception as e:
                 print(f"Unexpected error adding customer: {e}")
                 info("Error", f"An unexpected error occurred: {e}")
+        # --- END of modified add_customer function ---
 
         # Buttons Box
         button_box = Box(add_customer_win, layout="grid", width="fill", align="bottom")
@@ -948,7 +968,6 @@ def open_add_customer_window(parent_window):
         parent_window.show() # Ensure parent is shown again
 
 
-# --- Reverted: Add Booking Window (Simpler Version) ---
 def open_add_booking_window(parent_window):
     parent_window.hide() # Hide the menu while adding
 
@@ -1017,7 +1036,7 @@ def open_add_booking_window(parent_window):
             selected_trip_str = trip_combo_widget.value
             trip_date = None
             trip_id = None
-            current_available_seats = 0 
+            current_available_seats = 0
 
             # Try to extract ID and date
             # Extract TripID and Date from the combo string (e.g., "123: 2024-12-25 - London")
@@ -2240,7 +2259,7 @@ def open_query_window(parent_window):
     # END of lincoln_passengers
 
     # --- Query 2: Available trips ---
-    # --- Query 2: Available Upcoming Trips (MODIFIED TO USE GRID) --- 
+    # --- Query 2: Available Upcoming Trips (MODIFIED TO USE GRID) ---
     def available_trips():
         """Queries and displays upcoming trips with calculated available seats in a grid."""
         try:
