@@ -3,12 +3,11 @@ from guizero import App, Text, Picture, PushButton, Box, TextBox, Combo, Window,
 from mysql.connector import errorcode
 import datetime
 import re
-import math # Needed for ceil - actually not needed anymore, but leave it for now
 
 # --- Database Configuration ---
 DB_HOST = "localhost"
 DB_USER = "root"
-DB_PASSWORD = "root" # Replace with your actual password if different
+DB_PASSWORD = "root" 
 DB_NAME = "sdc_farrukh_u18"
 
 # --- Color Variables ---
@@ -16,7 +15,6 @@ BG_COLOR = "purple"
 BUTTON_BG_COLOR = "white"
 BUTTON_TEXT_COLOR = "black"
 TEXT_COLOR = "white"
-# Removed seat selection colors
 
 
 # --- Database Connection ---
@@ -48,10 +46,9 @@ except mysql.connector.Error as err:
     exit() # Stop the script
 
 # --- Pagination Globals ---
-# Variables to manage the display of large datasets in tables across multiple pages.
-current_page = 0 # General current page for main table views
-records_per_page = 15 # How many records to show per page in main table views
-query_records_per_page = 10 # Specific pagination for query results
+current_page = 0 
+records_per_page = 15 
+query_records_per_page = 10
 
 # --- Helper Functions for Table Display & Pagination ---
 
@@ -828,9 +825,6 @@ def open_add_customer_window(parent_window):
     add_button = None
     back_button = None
 
-    # --- REMOVED STATIC ERROR MESSAGE ---
-    # CUSTOMER_REQUIRED_FIELDS = ("First Name", "Surname", "Email", "Address Line 1", "City", "Postcode", "Phone Number")
-    # STATIC_ERROR_MESSAGE = f"Please ensure all required fields are entered correctly: [{', '.join(CUSTOMER_REQUIRED_FIELDS)}]"
 
     try:
         add_customer_win = Window(app, title="Add Customer", width=450, height=600, bg=BG_COLOR) # Use app as master
@@ -889,8 +883,8 @@ def open_add_customer_window(parent_window):
                 city = city_entry.value.strip()
                 postcode = postcode_entry.value.strip()
                 phone = phone_entry.value.strip()
-                address2 = address2_entry.value.strip() # Optional
-                notes = notes_entry.value.strip()       # Optional
+                address2 = address2_entry.value.strip() 
+                notes = notes_entry.value.strip()       
 
                 # --- Specific Validation Logic ---
                 error_messages = [] # List to hold specific error messages
