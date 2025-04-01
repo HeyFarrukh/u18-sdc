@@ -1123,7 +1123,6 @@ def open_add_booking_window(parent_window):
                 trip_combo_widget.enabled = True
                 num_people_entry_widget.enabled = True # Ensure enabled
             else:
-                 #trip_combo_widget.append("No upcoming trips available") # Optional: keep this in combo
                  trip_combo_widget.disable(); num_people_entry_widget.disable() # Disable number entry if no trips
                  no_trips_message.value = "No future trips available." # Set message text
                  no_trips_message.visible = True # Show the message
